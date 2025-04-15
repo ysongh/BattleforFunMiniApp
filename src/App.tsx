@@ -30,7 +30,7 @@ function ConnectMenu() {
   }
 
   return (
-    <button type="button" onClick={() => connect({ connector: connectors[0] })}>
+    <button className="bg-blue-400" type="button" onClick={() => connect({ connector: connectors[0] })}>
       Connect
     </button>
   );
@@ -41,7 +41,7 @@ function SignButton() {
 
   return (
     <>
-      <button type="button" onClick={() => signMessage({ message: "hello world" })} disabled={isPending}>
+      <button className="bg-blue-400" type="button" onClick={() => signMessage({ message: "hello world" })} disabled={isPending}>
         {isPending ? "Signing..." : "Sign message"}
       </button>
       {data && (

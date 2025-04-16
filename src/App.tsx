@@ -2,6 +2,8 @@ import { sdk } from "@farcaster/frame-sdk";
 import { useEffect } from "react";
 import { useAccount, useConnect, useSignMessage } from "wagmi";
 
+import Game from "./pages/Game";
+
 function App() {
   useEffect(() => {
     sdk.actions.ready();
@@ -11,6 +13,7 @@ function App() {
     <>
       <div>Mini App + Vite + TS + React + Wagmi</div>
       <ConnectMenu />
+      <Game />
     </>
   );
 }

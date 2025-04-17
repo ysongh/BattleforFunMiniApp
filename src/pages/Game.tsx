@@ -167,7 +167,7 @@ const isInRange = (unitPosition: [number, number], targetPosition: [number, numb
   return distance <= range;
 };
 
-const Game = () => {
+const AdvanceWarsGame = () => {
   const [grid, setGrid] = useState<Tile[][]>([]);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<Player>('Red');
@@ -442,10 +442,10 @@ const Game = () => {
       
       <div className="mb-4">
         <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-xl font-semibold mb-2">Turn: {currentPlayer}</h2>
+          <h2 className="text-xl font-semibold mb-2">Turn: <span className={currentPlayer === 'Red' ? 'text-red-600' : 'text-blue-600'}>{currentPlayer}</span></h2>
           <p className="mb-2">{gameStatus}</p>
           <button 
-            className="bg-blue-500 text-white px-4 py-2 rounded"
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
             onClick={endTurn}
           >
             End Turn
@@ -455,53 +455,100 @@ const Game = () => {
       
       <div className="grid grid-cols-10 gap-1 border-2 border-gray-400 p-1 bg-gray-200">
         {grid.map((row, y) => (
-          row.map((tile, x) => (
-            <div 
-              key={`${x}-${y}`}
-              className={`
-                w-12 h-12 relative
-                ${getTerrainColor(tile.terrain.type)}
-                ${isInMovementRange(x, y) ? 'ring-2 ring-white' : ''}
-                ${isInAttackRange(x, y) ? 'ring-2 ring-red-600' : ''}
-                ${selectedUnit && selectedUnit.position[0] === x && selectedUnit.position[1] === y ? 'ring-2 ring-yellow-400' : ''}
-                cursor-pointer
-              `}
-              onClick={() => handleTileClick(x, y)}
-            >
-              {tile.unit && (
-                <div 
-                  className={`
-                    absolute inset-0 flex items-center justify-center
-                    ${getUnitColor(tile.unit.player)}
-                    rounded-full m-1
-                    ${tile.unit.hasMoved || tile.unit.hasAttacked ? 'opacity-50' : ''}
-                  `}
-                >
-                  <div className="text-xs font-bold text-white">
-                    {tile.unit.type.charAt(0)}
+          row.map((tile, x) => {
+            // Determine tile highlighting
+            let highlightClass = '';
+            
+            // Selected unit highlight
+            if (selectedUnit && selectedUnit.position[0] === x && selectedUnit.position[1] === y) {
+              highlightClass = 'ring-4 ring-yellow-400 z-10';
+            }
+            // Movement range highlight
+            else if (isInMovementRange(x, y)) {
+              highlightClass = 'ring-4 ring-blue-300 ring-opacity-80 z-10';
+            }
+            // Attack range highlight
+            else if (isInAttackRange(x, y)) {
+              highlightClass = 'ring-4 ring-red-500 ring-opacity-80 z-10';
+            }
+            
+            return (
+              <div 
+                key={`${x}-${y}`}
+                className={`
+                  w-12 h-12 relative 
+                  ${getTerrainColor(tile.terrain.type)}
+                  ${highlightClass}
+                  cursor-pointer
+                  transition-all duration-200
+                  hover:brightness-110
+                `}
+                onClick={() => handleTileClick(x, y)}
+              >
+                {/* Movement overlay */}
+                {isInMovementRange(x, y) && (
+                  <div className="absolute inset-0 bg-blue-400 bg-opacity-30 z-0"></div>
+                )}
+                
+                {/* Attack overlay */}
+                {isInAttackRange(x, y) && (
+                  <div className="absolute inset-0 bg-red-400 bg-opacity-30 z-0"></div>
+                )}
+                
+                {/* Unit */}
+                {tile.unit && (
+                  <div 
+                    className={`
+                      absolute inset-0 flex items-center justify-center
+                      ${getUnitColor(tile.unit.player)}
+                      rounded-full m-1 z-20
+                      ${tile.unit.hasMoved || tile.unit.hasAttacked ? 'opacity-50' : ''}
+                      ${selectedUnit && selectedUnit.id === tile.unit.id ? 'ring-2 ring-yellow-300' : ''}
+                    `}
+                  >
+                    <div className="text-xs font-bold text-white">
+                      {tile.unit.type.charAt(0)}
+                    </div>
+                    <div className="absolute bottom-0 right-0 text-xs bg-black bg-opacity-50 text-white px-1 rounded">
+                      {tile.unit.health}
+                    </div>
                   </div>
-                  <div className="absolute bottom-0 right-0 text-xs bg-black bg-opacity-50 text-white px-1 rounded">
-                    {tile.unit.health}
-                  </div>
+                )}
+                
+                {/* Coordinates for debugging */}
+                <div className="absolute top-0 left-0 text-xs text-gray-700 opacity-50">
+                  {x},{y}
                 </div>
-              )}
-            </div>
-          ))
+              </div>
+            );
+          })
         ))}
       </div>
       
-      <div className="mt-4 bg-white p-4 rounded shadow">
+      <div className="mt-4 bg-white p-4 rounded shadow w-full max-w-md">
         <h3 className="font-semibold mb-2">How to Play:</h3>
         <ul className="list-disc pl-4 text-sm">
           <li>Click on a unit to select it</li>
-          <li>Click on a highlighted tile to move there</li>
-          <li>Click on a red-highlighted enemy to attack</li>
+          <li>Click on a <span className="text-blue-500 font-semibold">blue highlighted</span> tile to move there</li>
+          <li>Click on a <span className="text-red-500 font-semibold">red highlighted</span> enemy to attack</li>
           <li>End your turn when you're finished</li>
           <li>Destroy all enemy units to win!</li>
         </ul>
+        
+        <h3 className="font-semibold mt-4 mb-2">Unit Types:</h3>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div>
+            <p><strong>Infantry:</strong> Basic unit</p>
+            <p><strong>Tank:</strong> Strong attack, good movement</p>
+          </div>
+          <div>
+            <p><strong>Artillery:</strong> Long range, weak defense</p>
+            <p><strong>APC:</strong> Fast movement, no attack</p>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
-export default Game;
+export default AdvanceWarsGame;

@@ -32,7 +32,7 @@ interface Tile {
 }
 
 // Game constants
-const GRID_SIZE = 10;
+const GRID_SIZE = 20; // Expanded to 20x20
 const UNIT_TYPES: Record<UnitType, Omit<Unit, 'id' | 'position' | 'hasMoved' | 'hasAttacked' | 'player'>> = {
   Infantry: {
     type: 'Infantry',
@@ -119,35 +119,50 @@ const generateInitialGrid = (): Tile[][] => {
     }
   }
 
-  // Add some mountains
-  for (let i = 0; i < 8; i++) {
+  // Add some mountains (scaled up for 20x20)
+  for (let i = 0; i < 30; i++) {
     const x = Math.floor(Math.random() * GRID_SIZE);
     const y = Math.floor(Math.random() * GRID_SIZE);
     grid[y][x].terrain = TERRAIN_TYPES.Mountain;
   }
 
-  // Add some forests
-  for (let i = 0; i < 12; i++) {
+  // Add some forests (scaled up for 20x20)
+  for (let i = 0; i < 40; i++) {
     const x = Math.floor(Math.random() * GRID_SIZE);
     const y = Math.floor(Math.random() * GRID_SIZE);
     grid[y][x].terrain = TERRAIN_TYPES.Forest;
   }
 
-  // Add some cities
-  for (let i = 0; i < 6; i++) {
+  // Add some cities (scaled up for 20x20)
+  for (let i = 0; i < 15; i++) {
     const x = Math.floor(Math.random() * GRID_SIZE);
     const y = Math.floor(Math.random() * GRID_SIZE);
     grid[y][x].terrain = TERRAIN_TYPES.City;
   }
 
-  // Add a road
-  const startX = Math.floor(Math.random() * GRID_SIZE);
-  let x = startX;
-  for (let y = 0; y < GRID_SIZE; y++) {
-    grid[y][x].terrain = TERRAIN_TYPES.Road;
-    // Make the road go left or right sometimes
-    if (Math.random() > 0.7 && x > 0 && x < GRID_SIZE - 1) {
-      x += Math.random() > 0.5 ? 1 : -1;
+  // Add multiple roads
+  for (let i = 0; i < 3; i++) {
+    const startX = Math.floor(Math.random() * GRID_SIZE);
+    let x = startX;
+    for (let y = 0; y < GRID_SIZE; y++) {
+      grid[y][x].terrain = TERRAIN_TYPES.Road;
+      // Make the road go left or right sometimes
+      if (Math.random() > 0.7 && x > 0 && x < GRID_SIZE - 1) {
+        x += Math.random() > 0.5 ? 1 : -1;
+      }
+    }
+  }
+
+  // Add horizontal roads too
+  for (let i = 0; i < 3; i++) {
+    const startY = Math.floor(Math.random() * GRID_SIZE);
+    let y = startY;
+    for (let x = 0; x < GRID_SIZE; x++) {
+      grid[y][x].terrain = TERRAIN_TYPES.Road;
+      // Make the road go up or down sometimes
+      if (Math.random() > 0.7 && y > 0 && y < GRID_SIZE - 1) {
+        y += Math.random() > 0.5 ? 1 : -1;
+      }
     }
   }
 
@@ -167,13 +182,15 @@ const isInRange = (unitPosition: [number, number], targetPosition: [number, numb
   return distance <= range;
 };
 
-const AdvanceWarsGame = () => {
+const Game = () => {
   const [grid, setGrid] = useState<Tile[][]>([]);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<Player>('Red');
   const [movementRange, setMovementRange] = useState<[number, number][]>([]);
   const [attackRange, setAttackRange] = useState<[number, number][]>([]);
   const [gameStatus, setGameStatus] = useState<string>('Select a unit to move');
+  const [viewportPosition, setViewportPosition] = useState<[number, number]>([0, 0]); // Track viewport position for large grid
+  const [viewSize, setViewSize] = useState<number>(10); // Number of tiles visible at once
 
   useEffect(() => {
     initializeGame();
@@ -182,16 +199,21 @@ const AdvanceWarsGame = () => {
   const initializeGame = () => {
     const initialGrid = generateInitialGrid();
     
-    // Add initial units
-    // Red player's units
-    initialGrid[0][1].unit = createUnit('Infantry', [1, 0], 'Red');
-    initialGrid[1][0].unit = createUnit('Tank', [0, 1], 'Red');
-    initialGrid[2][1].unit = createUnit('Artillery', [1, 2], 'Red');
+    // Add initial units with more separation for a 20x20 grid
     
-    // Blue player's units
-    initialGrid[GRID_SIZE - 1][GRID_SIZE - 2].unit = createUnit('Infantry', [GRID_SIZE - 2, GRID_SIZE - 1], 'Blue');
-    initialGrid[GRID_SIZE - 2][GRID_SIZE - 1].unit = createUnit('Tank', [GRID_SIZE - 1, GRID_SIZE - 2], 'Blue');
-    initialGrid[GRID_SIZE - 3][GRID_SIZE - 2].unit = createUnit('Artillery', [GRID_SIZE - 2, GRID_SIZE - 3], 'Blue');
+    // Red player's units - top left corner
+    initialGrid[1][2].unit = createUnit('Infantry', [2, 1], 'Red');
+    initialGrid[2][1].unit = createUnit('Tank', [1, 2], 'Red');
+    initialGrid[3][2].unit = createUnit('Artillery', [2, 3], 'Red');
+    initialGrid[1][4].unit = createUnit('Infantry', [4, 1], 'Red');
+    initialGrid[2][5].unit = createUnit('APC', [5, 2], 'Red');
+    
+    // Blue player's units - bottom right corner
+    initialGrid[GRID_SIZE - 2][GRID_SIZE - 3].unit = createUnit('Infantry', [GRID_SIZE - 3, GRID_SIZE - 2], 'Blue');
+    initialGrid[GRID_SIZE - 3][GRID_SIZE - 2].unit = createUnit('Tank', [GRID_SIZE - 2, GRID_SIZE - 3], 'Blue');
+    initialGrid[GRID_SIZE - 4][GRID_SIZE - 3].unit = createUnit('Artillery', [GRID_SIZE - 3, GRID_SIZE - 4], 'Blue');
+    initialGrid[GRID_SIZE - 2][GRID_SIZE - 5].unit = createUnit('Infantry', [GRID_SIZE - 5, GRID_SIZE - 2], 'Blue');
+    initialGrid[GRID_SIZE - 3][GRID_SIZE - 6].unit = createUnit('APC', [GRID_SIZE - 6, GRID_SIZE - 3], 'Blue');
     
     setGrid(initialGrid);
   };
@@ -272,6 +294,9 @@ const AdvanceWarsGame = () => {
     
     setSelectedUnit(unit);
     
+    // Center viewport on selected unit
+    centerViewportOn(x, y);
+    
     if (!unit.hasMoved) {
       const moveRange = calculateMovementRange(unit);
       setMovementRange(moveRange);
@@ -331,6 +356,9 @@ const AdvanceWarsGame = () => {
     setGrid(updatedGrid);
     setSelectedUnit(updatedUnit);
     setMovementRange([]);
+    
+    // Center viewport on the new position
+    centerViewportOn(x, y);
     
     // Check if the unit can attack after moving
     if (updatedUnit.attackRange > 0) {
@@ -421,11 +449,22 @@ const AdvanceWarsGame = () => {
     }));
     
     setGrid(updatedGrid);
-    setCurrentPlayer(currentPlayer === 'Red' ? 'Blue' : 'Red');
+    const nextPlayer = currentPlayer === 'Red' ? 'Blue' : 'Red';
+    setCurrentPlayer(nextPlayer);
     setSelectedUnit(null);
     setMovementRange([]);
     setAttackRange([]);
-    setGameStatus(`${currentPlayer === 'Red' ? 'Blue' : 'Red'}'s turn`);
+    setGameStatus(`${nextPlayer}'s turn`);
+    
+    // Find a unit of the next player to center the viewport on
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        if (updatedGrid[y][x].unit && updatedGrid[y][x].unit.player === nextPlayer) {
+          centerViewportOn(x, y);
+          return;
+        }
+      }
+    }
   };
 
   const isInMovementRange = (x: number, y: number): boolean => {
@@ -435,63 +474,188 @@ const AdvanceWarsGame = () => {
   const isInAttackRange = (x: number, y: number): boolean => {
     return attackRange.some(([ax, ay]) => ax === x && ay === y);
   };
+  
+  const moveViewport = (dx: number, dy: number) => {
+    const [x, y] = viewportPosition;
+    const newX = Math.max(0, Math.min(GRID_SIZE - viewSize, x + dx));
+    const newY = Math.max(0, Math.min(GRID_SIZE - viewSize, y + dy));
+    setViewportPosition([newX, newY]);
+  };
+  
+  const centerViewportOn = (x: number, y: number) => {
+    const halfViewSize = Math.floor(viewSize / 2);
+    const newX = Math.max(0, Math.min(GRID_SIZE - viewSize, x - halfViewSize));
+    const newY = Math.max(0, Math.min(GRID_SIZE - viewSize, y - halfViewSize));
+    setViewportPosition([newX, newY]);
+  };
+  
+  // Get the visible portion of the grid
+  const visibleGrid = () => {
+    const [viewX, viewY] = viewportPosition;
+    const viewGrid: Tile[][] = [];
+    
+    for (let y = viewY; y < Math.min(GRID_SIZE, viewY + viewSize); y++) {
+      const row: Tile[] = [];
+      for (let x = viewX; x < Math.min(GRID_SIZE, viewX + viewSize); x++) {
+        if (grid[y] && grid[y][x]) {
+          row.push(grid[y][x]);
+        }
+      }
+      viewGrid.push(row);
+    }
+    
+    return viewGrid;
+  };
+
+  // Find all units of the current player
+  const findCurrentPlayerUnits = (): [number, number][] => {
+    const units: [number, number][] = [];
+    
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        if (grid[y] && grid[y][x] && grid[y][x].unit && grid[y][x].unit.player === currentPlayer) {
+          units.push([x, y]);
+        }
+      }
+    }
+    
+    return units;
+  };
+  
+  const cycleToNextUnit = () => {
+    const units = findCurrentPlayerUnits();
+    if (units.length === 0) return;
+    
+    // Find the next unit after the selected one
+    let nextUnitIndex = 0;
+    if (selectedUnit) {
+      const [selectedX, selectedY] = selectedUnit.position;
+      const currentIndex = units.findIndex(([x, y]) => x === selectedX && y === selectedY);
+      if (currentIndex !== -1) {
+        nextUnitIndex = (currentIndex + 1) % units.length;
+      }
+    }
+    
+    const [x, y] = units[nextUnitIndex];
+    handleUnitSelect(x, y);
+  };
 
   return (
-    <div className="flex flex-col items-center p-4 bg-gray-100 min-h-screen">
-      <h1 className="text-3xl font-bold mb-4">Battle for Fun</h1>
+    <div className="flex flex-col items-center p-2 bg-gray-100 min-h-screen">
+      <h1 className="text-2xl font-bold mb-2">Battle for Fun</h1>
       
-      <div className="mb-4">
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-xl font-semibold mb-2">Turn: <span className={currentPlayer === 'Red' ? 'text-red-600' : 'text-blue-600'}>{currentPlayer}</span></h2>
-          <p className="mb-2">{gameStatus}</p>
-          <button 
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-            onClick={endTurn}
-          >
-            End Turn
-          </button>
+      <div className="flex flex-wrap gap-2 mb-2 justify-center">
+        <div className="bg-white p-2 rounded shadow">
+          <h2 className="text-lg font-semibold">Turn: <span className={currentPlayer === 'Red' ? 'text-red-600' : 'text-blue-600'}>{currentPlayer}</span></h2>
+          <p className="text-sm">{gameStatus}</p>
+          <div className="flex gap-2 mt-2">
+            <button 
+              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+              onClick={endTurn}
+            >
+              End Turn
+            </button>
+            <button 
+              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
+              onClick={cycleToNextUnit}
+            >
+              Next Unit
+            </button>
+          </div>
+        </div>
+        
+        <div className="bg-white p-2 rounded shadow">
+          <h3 className="text-sm font-semibold mb-1">Navigation:</h3>
+          <div className="grid grid-cols-3 gap-1">
+            <div></div>
+            <button 
+              className="bg-gray-200 hover:bg-gray-300 p-1 rounded"
+              onClick={() => moveViewport(0, -1)}
+            >
+              ↑
+            </button>
+            <div></div>
+            <button 
+              className="bg-gray-200 hover:bg-gray-300 p-1 rounded"
+              onClick={() => moveViewport(-1, 0)}
+            >
+              ←
+            </button>
+            <button 
+              className="bg-gray-200 hover:bg-gray-300 p-1 rounded"
+              onClick={() => {
+                const units = findCurrentPlayerUnits();
+                if (units.length > 0) {
+                  const [x, y] = units[0];
+                  centerViewportOn(x, y);
+                }
+              }}
+            >
+              ⌂
+            </button>
+            <button 
+              className="bg-gray-200 hover:bg-gray-300 p-1 rounded"
+              onClick={() => moveViewport(1, 0)}
+            >
+              →
+            </button>
+            <div></div>
+            <button 
+              className="bg-gray-200 hover:bg-gray-300 p-1 rounded"
+              onClick={() => moveViewport(0, 1)}
+            >
+              ↓
+            </button>
+            <div></div>
+          </div>
+          <div className="mt-1 text-xs text-center">
+            Viewing: ({viewportPosition[0]},{viewportPosition[1]})
+          </div>
         </div>
       </div>
       
-      <div className="grid grid-cols-10 gap-1 border-2 border-gray-400 p-1 bg-gray-200">
-        {grid.map((row, y) => (
-          row.map((tile, x) => {
+      <div className="grid grid-cols-10 gap-px border-2 border-gray-400 p-1 bg-gray-200">
+        {visibleGrid().map((row, relY) => (
+          row.map((tile, relX) => {
+            const absoluteX = viewportPosition[0] + relX;
+            const absoluteY = viewportPosition[1] + relY;
+            
             // Determine tile highlighting
             let highlightClass = '';
             
             // Selected unit highlight
-            if (selectedUnit && selectedUnit.position[0] === x && selectedUnit.position[1] === y) {
+            if (selectedUnit && selectedUnit.position[0] === absoluteX && selectedUnit.position[1] === absoluteY) {
               highlightClass = 'ring-4 ring-yellow-400 z-10';
             }
             // Movement range highlight
-            else if (isInMovementRange(x, y)) {
+            else if (isInMovementRange(absoluteX, absoluteY)) {
               highlightClass = 'ring-4 ring-blue-300 ring-opacity-80 z-10';
             }
             // Attack range highlight
-            else if (isInAttackRange(x, y)) {
+            else if (isInAttackRange(absoluteX, absoluteY)) {
               highlightClass = 'ring-4 ring-red-500 ring-opacity-80 z-10';
             }
             
             return (
               <div 
-                key={`${x}-${y}`}
+                key={`${absoluteX}-${absoluteY}`}
                 className={`
-                  w-12 h-12 relative 
+                  w-10 h-10 relative 
                   ${getTerrainColor(tile.terrain.type)}
                   ${highlightClass}
                   cursor-pointer
                   transition-all duration-200
                   hover:brightness-110
                 `}
-                onClick={() => handleTileClick(x, y)}
+                onClick={() => handleTileClick(absoluteX, absoluteY)}
               >
                 {/* Movement overlay */}
-                {isInMovementRange(x, y) && (
+                {isInMovementRange(absoluteX, absoluteY) && (
                   <div className="absolute inset-0 bg-blue-400 bg-opacity-30 z-0"></div>
                 )}
                 
                 {/* Attack overlay */}
-                {isInAttackRange(x, y) && (
+                {isInAttackRange(absoluteX, absoluteY) && (
                   <div className="absolute inset-0 bg-red-400 bg-opacity-30 z-0"></div>
                 )}
                 
@@ -515,9 +679,9 @@ const AdvanceWarsGame = () => {
                   </div>
                 )}
                 
-                {/* Coordinates for debugging */}
+                {/* Coordinates display */}
                 <div className="absolute top-0 left-0 text-xs text-gray-700 opacity-50">
-                  {x},{y}
+                  {absoluteX},{absoluteY}
                 </div>
               </div>
             );
@@ -525,25 +689,27 @@ const AdvanceWarsGame = () => {
         ))}
       </div>
       
-      <div className="mt-4 bg-white p-4 rounded shadow w-full max-w-md">
-        <h3 className="font-semibold mb-2">How to Play:</h3>
-        <ul className="list-disc pl-4 text-sm">
-          <li>Click on a unit to select it</li>
-          <li>Click on a <span className="text-blue-500 font-semibold">blue highlighted</span> tile to move there</li>
-          <li>Click on a <span className="text-red-500 font-semibold">red highlighted</span> enemy to attack</li>
-          <li>End your turn when you're finished</li>
-          <li>Destroy all enemy units to win!</li>
-        </ul>
-        
-        <h3 className="font-semibold mt-4 mb-2">Unit Types:</h3>
-        <div className="grid grid-cols-2 gap-2 text-sm">
+      <div className="mt-2 bg-white p-2 rounded shadow w-full max-w-md">
+        <div className="flex justify-between">
           <div>
-            <p><strong>Infantry:</strong> Basic unit</p>
-            <p><strong>Tank:</strong> Strong attack, good movement</p>
+            <h3 className="font-semibold text-sm">How to Play:</h3>
+            <ul className="list-disc pl-4 text-xs">
+              <li>Click on a unit to select it</li>
+              <li>Click on a <span className="text-blue-500 font-semibold">blue highlighted</span> tile to move</li>
+              <li>Click on a <span className="text-red-500 font-semibold">red highlighted</span> enemy to attack</li>
+              <li>Use arrow buttons to navigate the map</li>
+              <li>Use "Next Unit" to cycle through your units</li>
+            </ul>
           </div>
+          
           <div>
-            <p><strong>Artillery:</strong> Long range, weak defense</p>
-            <p><strong>APC:</strong> Fast movement, no attack</p>
+            <h3 className="font-semibold text-sm">Unit Types:</h3>
+            <div className="text-xs">
+              <p><strong>I</strong>: Infantry - Basic unit</p>
+              <p><strong>T</strong>: Tank - Strong attack</p>
+              <p><strong>A</strong>: Artillery - Long range</p>
+              <p><strong>P</strong>: APC - Fast movement</p>
+            </div>
           </div>
         </div>
       </div>
@@ -551,4 +717,4 @@ const AdvanceWarsGame = () => {
   );
 };
 
-export default AdvanceWarsGame;
+export default Game;

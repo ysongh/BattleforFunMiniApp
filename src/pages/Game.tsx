@@ -5,6 +5,11 @@ type UnitType = 'Infantry' | 'Tank' | 'Artillery' | 'APC';
 type TerrainType = 'Plain' | 'Mountain' | 'Forest' | 'City' | 'Road';
 type Player = 'Red' | 'Blue';
 
+interface City extends Terrain {
+  owner: Player | null;
+  captureProgress: number;
+}
+
 interface Unit {
   id: string;
   type: UnitType;
@@ -23,6 +28,7 @@ interface Terrain {
   type: TerrainType;
   defenseBonus: number;
   movementCost: number;
+  isCity?: boolean; // Flag to identify cities
 }
 
 interface Tile {
@@ -72,7 +78,12 @@ const TERRAIN_TYPES: Record<TerrainType, Terrain> = {
   Plain: { type: 'Plain', defenseBonus: 0, movementCost: 1 },
   Mountain: { type: 'Mountain', defenseBonus: 30, movementCost: 3 },
   Forest: { type: 'Forest', defenseBonus: 10, movementCost: 2 },
-  City: { type: 'City', defenseBonus: 20, movementCost: 1 },
+  City: { 
+    type: 'City', 
+    defenseBonus: 20, 
+    movementCost: 1,
+    isCity: true 
+  },
   Road: { type: 'Road', defenseBonus: 0, movementCost: 0.5 },
 };
 
@@ -191,6 +202,10 @@ const Game = () => {
   const [gameStatus, setGameStatus] = useState<string>('Select a unit to move');
   const [viewportPosition, setViewportPosition] = useState<[number, number]>([0, 0]); // Track viewport position for large grid
   const [viewSize, setViewSize] = useState<number>(10); // Number of tiles visible at once
+  const [resources, setResources] = useState<Record<Player, number>>({
+    Red: 1000,
+    Blue: 1000,
+  });
 
   useEffect(() => {
     initializeGame();
@@ -216,6 +231,88 @@ const Game = () => {
     initialGrid[GRID_SIZE - 3][GRID_SIZE - 6].unit = createUnit('APC', [GRID_SIZE - 6, GRID_SIZE - 3], 'Blue');
     
     setGrid(initialGrid);
+  };
+
+  // Initialize cities with ownership
+  const initializeGrid = () => {
+    const initialGrid = generateInitialGrid();
+    
+    // Process each tile to add city ownership
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        if (initialGrid[y][x].terrain.type === 'City') {
+          initialGrid[y][x].terrain = {
+            ...initialGrid[y][x].terrain,
+            owner: null,
+            captureProgress: 0
+          } as City;
+        }
+      }
+    }
+    
+    // Assign initial cities to players - first city on either end of map
+    let redCityAssigned = false;
+    let blueCityAssigned = false;
+    
+    for (let y = 0; y < GRID_SIZE && (!redCityAssigned || !blueCityAssigned); y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const terrain = initialGrid[y][x].terrain;
+        if (terrain.type === 'City') {
+          if (!redCityAssigned && y < 3) {
+            (terrain as City).owner = 'Red';
+            redCityAssigned = true;
+          } else if (!blueCityAssigned && y >= GRID_SIZE - 3) {
+            (terrain as City).owner = 'Blue';
+            blueCityAssigned = true;
+          }
+        }
+        if (redCityAssigned && blueCityAssigned) break;
+      }
+    }
+    
+    return initialGrid;
+  };
+
+  // Handle capturing cities
+  const captureCity = (unit: Unit, x: number, y: number) => {
+    const tile = grid[y][x];
+    if (!tile.terrain.isCity) return false;
+    
+    const city = tile.terrain as City;
+    
+    // Reset capture progress if city belongs to enemy
+    if (city.owner && city.owner !== unit.player) {
+      city.captureProgress = 0;
+    }
+    
+    // Increase capture progress (Infantry captures in 2 turns)
+    const captureAmount = unit.type === 'Infantry' ? 50 : 0; // Only infantry can capture
+    
+    if (captureAmount > 0) {
+      city.captureProgress += captureAmount;
+      
+      // If city is fully captured
+      if (city.captureProgress >= 100) {
+        city.owner = unit.player;
+        city.captureProgress = 0;
+        setGameStatus(`${unit.player} captured a city!`);
+      } else {
+        setGameStatus(`Capturing: ${city.captureProgress}%`);
+      }
+      
+      // Update grid with modified city
+      const updatedGrid = [...grid];
+      updatedGrid[y][x].terrain = city;
+      setGrid(updatedGrid);
+      
+      // Mark unit as having "attacked" (used its action)
+      const updatedUnit = { ...unit, hasAttacked: true };
+      updatedGrid[y][x].unit = updatedUnit;
+      setSelectedUnit(updatedUnit);
+      return true;
+    }
+    
+    return false;
   };
 
   const calculateMovementRange = (unit: Unit): [number, number][] => {
@@ -333,6 +430,21 @@ const Game = () => {
       handleUnitSelect(x, y);
       return;
     }
+
+    if (selectedUnit && 
+        !selectedUnit.hasAttacked && 
+        selectedUnit.position[0] === x && 
+        selectedUnit.position[1] === y &&
+        grid[y][x].terrain.isCity) {
+      const city = grid[y][x].terrain as City;
+      
+      // City is either neutral or belongs to the enemy
+      if (!city.owner || city.owner !== selectedUnit.player) {
+        if (captureCity(selectedUnit, x, y)) {
+          return; // Capture action was performed, exit the function
+        }
+      }
+    }
     
     // Clear selection if clicking elsewhere
     setSelectedUnit(null);
@@ -343,8 +455,16 @@ const Game = () => {
   const moveUnit = (unit: Unit, x: number, y: number) => {
     const updatedGrid = [...grid];
     
-    // Remove unit from old position
+    // If unit was on a city that was being captured, reset progress if we move away
     const [oldX, oldY] = unit.position;
+    const oldTile = grid[oldY][oldX];
+    if (oldTile.terrain.isCity) {
+      const city = oldTile.terrain as City;
+      if (city.owner !== unit.player && city.captureProgress > 0) {
+        city.captureProgress = 0;
+        updatedGrid[oldY][oldX].terrain = city;
+      }
+    }
     updatedGrid[oldY][oldX].unit = null;
     
     // Update unit position
@@ -449,7 +569,28 @@ const Game = () => {
     }));
     
     setGrid(updatedGrid);
+    // Before changing the current player, collect resources from owned cities
     const nextPlayer = currentPlayer === 'Red' ? 'Blue' : 'Red';
+    let cityIncome = 0;
+    
+    // Count cities owned by the next player
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const terrain = grid[y][x].terrain;
+        if (terrain.isCity && (terrain as City).owner === nextPlayer) {
+          cityIncome += 100; // Each city provides 100 funds per turn
+        }
+      }
+    }
+    
+    // Update resources for the next player
+    if (cityIncome > 0) {
+      setResources(prev => ({
+        ...prev,
+        [nextPlayer]: prev[nextPlayer] + cityIncome
+      }));
+      setGameStatus(`${nextPlayer} received ${cityIncome} funds from cities`);
+    }
     setCurrentPlayer(nextPlayer);
     setSelectedUnit(null);
     setMovementRange([]);
@@ -465,6 +606,12 @@ const Game = () => {
         }
       }
     }
+  };
+
+  // Render the city ownership on the game board
+  const getCityOwnerColor = (city: City): string => {
+    if (!city.owner) return 'border-gray-600'; // Neutral
+    return city.owner === 'Red' ? 'border-red-600' : 'border-blue-600';
   };
 
   const isInMovementRange = (x: number, y: number): boolean => {
@@ -676,6 +823,23 @@ const Game = () => {
                     <div className="absolute bottom-0 right-0 text-xs bg-black bg-opacity-50 text-white px-1 rounded">
                       {tile.unit.health}
                     </div>
+                  </div>
+                )}
+
+                {tile.terrain.isCity && (
+                  <div 
+                    className={`absolute inset-0 border-4 ${getCityOwnerColor(tile.terrain as City)}`}
+                  >
+                    {(tile.terrain as City).captureProgress > 0 && (
+                      <div 
+                        className="absolute bottom-0 left-0 right-0 h-1 bg-gray-600"
+                      >
+                        <div 
+                          className="h-full bg-yellow-500" 
+                          style={{ width: `${(tile.terrain as City).captureProgress}%` }} 
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
                 

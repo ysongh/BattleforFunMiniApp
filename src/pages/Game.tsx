@@ -303,11 +303,12 @@ const Game = () => {
       // Update grid with modified city
       const updatedGrid = [...grid];
       updatedGrid[y][x].terrain = city;
-      setGrid(updatedGrid);
       
       // Mark unit as having "attacked" (used its action)
       const updatedUnit = { ...unit, hasAttacked: true };
       updatedGrid[y][x].unit = updatedUnit;
+
+      setGrid(updatedGrid);
       setSelectedUnit(updatedUnit);
       return true;
     }
@@ -406,6 +407,22 @@ const Game = () => {
   };
 
   const handleTileClick = (x: number, y: number) => {
+    // Handle city capture attempt (when unit is on a capturable tile)
+    if (selectedUnit && 
+        !selectedUnit.hasAttacked && 
+        selectedUnit.position[0] === x && 
+        selectedUnit.position[1] === y &&
+        grid[y][x].terrain.isCity) {
+      const city = grid[y][x].terrain as City;
+      
+      // City is either neutral or belongs to the enemy
+      if (!city.owner || city.owner !== selectedUnit.player) {
+        if (captureCity(selectedUnit, x, y)) {
+          return; // Capture action was performed, exit the function
+        }
+      }
+    }
+
     if (!selectedUnit) {
       if (grid[y][x].unit && grid[y][x].unit.player === currentPlayer) {
         handleUnitSelect(x, y);
@@ -430,21 +447,6 @@ const Game = () => {
       handleUnitSelect(x, y);
       return;
     }
-
-    if (selectedUnit && 
-        !selectedUnit.hasAttacked && 
-        selectedUnit.position[0] === x && 
-        selectedUnit.position[1] === y &&
-        grid[y][x].terrain.isCity) {
-      const city = grid[y][x].terrain as City;
-      
-      // City is either neutral or belongs to the enemy
-      if (!city.owner || city.owner !== selectedUnit.player) {
-        if (captureCity(selectedUnit, x, y)) {
-          return; // Capture action was performed, exit the function
-        }
-      }
-    }
     
     // Clear selection if clicking elsewhere
     setSelectedUnit(null);
@@ -457,6 +459,8 @@ const Game = () => {
     
     // If unit was on a city that was being captured, reset progress if we move away
     const [oldX, oldY] = unit.position;
+    updatedGrid[oldY][oldX].unit = null;
+
     const oldTile = grid[oldY][oldX];
     if (oldTile.terrain.isCity) {
       const city = oldTile.terrain as City;
@@ -465,8 +469,7 @@ const Game = () => {
         updatedGrid[oldY][oldX].terrain = city;
       }
     }
-    updatedGrid[oldY][oldX].unit = null;
-    
+   
     // Update unit position
     const updatedUnit = { ...unit, position: [x, y] as [number, number], hasMoved: true };
     
@@ -695,6 +698,10 @@ const Game = () => {
         <div className="bg-white p-2 rounded shadow">
           <h2 className="text-lg font-semibold">Turn: <span className={currentPlayer === 'Red' ? 'text-red-600' : 'text-blue-600'}>{currentPlayer}</span></h2>
           <p className="text-sm">{gameStatus}</p>
+          <div className="flex gap-4 mb-2">
+            <p className="text-red-600 font-bold">Red: ${resources.Red}</p>
+            <p className="text-blue-600 font-bold">Blue: ${resources.Blue}</p>
+          </div>
           <div className="flex gap-2 mt-2">
             <button 
               className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"

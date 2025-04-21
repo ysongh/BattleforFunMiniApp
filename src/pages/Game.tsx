@@ -213,30 +213,7 @@ const Game = () => {
 
   const initializeGame = () => {
     const initialGrid = generateInitialGrid();
-    
-    // Add initial units with more separation for a 20x20 grid
-    
-    // Red player's units - top left corner
-    initialGrid[1][2].unit = createUnit('Infantry', [2, 1], 'Red');
-    initialGrid[2][1].unit = createUnit('Tank', [1, 2], 'Red');
-    initialGrid[3][2].unit = createUnit('Artillery', [2, 3], 'Red');
-    initialGrid[1][4].unit = createUnit('Infantry', [4, 1], 'Red');
-    initialGrid[2][5].unit = createUnit('APC', [5, 2], 'Red');
-    
-    // Blue player's units - bottom right corner
-    initialGrid[GRID_SIZE - 2][GRID_SIZE - 3].unit = createUnit('Infantry', [GRID_SIZE - 3, GRID_SIZE - 2], 'Blue');
-    initialGrid[GRID_SIZE - 3][GRID_SIZE - 2].unit = createUnit('Tank', [GRID_SIZE - 2, GRID_SIZE - 3], 'Blue');
-    initialGrid[GRID_SIZE - 4][GRID_SIZE - 3].unit = createUnit('Artillery', [GRID_SIZE - 3, GRID_SIZE - 4], 'Blue');
-    initialGrid[GRID_SIZE - 2][GRID_SIZE - 5].unit = createUnit('Infantry', [GRID_SIZE - 5, GRID_SIZE - 2], 'Blue');
-    initialGrid[GRID_SIZE - 3][GRID_SIZE - 6].unit = createUnit('APC', [GRID_SIZE - 6, GRID_SIZE - 3], 'Blue');
-    
-    setGrid(initialGrid);
-  };
 
-  // Initialize cities with ownership
-  const initializeGrid = () => {
-    const initialGrid = generateInitialGrid();
-    
     // Process each tile to add city ownership
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {
@@ -270,7 +247,23 @@ const Game = () => {
       }
     }
     
-    return initialGrid;
+    // Add initial units with more separation for a 20x20 grid
+    
+    // Red player's units - top left corner
+    initialGrid[1][2].unit = createUnit('Infantry', [2, 1], 'Red');
+    initialGrid[2][1].unit = createUnit('Tank', [1, 2], 'Red');
+    initialGrid[3][2].unit = createUnit('Artillery', [2, 3], 'Red');
+    initialGrid[1][4].unit = createUnit('Infantry', [4, 1], 'Red');
+    initialGrid[2][5].unit = createUnit('APC', [5, 2], 'Red');
+    
+    // Blue player's units - bottom right corner
+    initialGrid[GRID_SIZE - 2][GRID_SIZE - 3].unit = createUnit('Infantry', [GRID_SIZE - 3, GRID_SIZE - 2], 'Blue');
+    initialGrid[GRID_SIZE - 3][GRID_SIZE - 2].unit = createUnit('Tank', [GRID_SIZE - 2, GRID_SIZE - 3], 'Blue');
+    initialGrid[GRID_SIZE - 4][GRID_SIZE - 3].unit = createUnit('Artillery', [GRID_SIZE - 3, GRID_SIZE - 4], 'Blue');
+    initialGrid[GRID_SIZE - 2][GRID_SIZE - 5].unit = createUnit('Infantry', [GRID_SIZE - 5, GRID_SIZE - 2], 'Blue');
+    initialGrid[GRID_SIZE - 3][GRID_SIZE - 6].unit = createUnit('APC', [GRID_SIZE - 6, GRID_SIZE - 3], 'Blue');
+    
+    setGrid(initialGrid);
   };
 
   // Handle capturing cities

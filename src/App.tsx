@@ -1,6 +1,7 @@
 import { sdk } from "@farcaster/frame-sdk";
 import { useEffect } from "react";
 import { useAccount, useConnect, useSignMessage } from "wagmi";
+import { HashRouter, Route, Routes } from 'react-router-dom';
 
 import Game from "./pages/Game";
 
@@ -10,11 +11,20 @@ function App() {
   }, []);
 
   return (
-    <>
-      <div>Mini App + Vite + TS + React + Wagmi</div>
-      <ConnectMenu />
-      <Game />
-    </>
+    <HashRouter>
+    <Routes>
+      <Route
+        path="/game"
+        element={<Game />} />
+      <Route
+        path="/"
+        element={ <>
+          <div>Mini App + Vite + TS + React + Wagmi</div>
+          <ConnectMenu />
+          <Game />
+        </>} />
+    </Routes>
+  </HashRouter>
   );
 }
 

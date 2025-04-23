@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useAccount, useConnect, useSignMessage } from "wagmi";
 import { HashRouter, Route, Routes } from 'react-router-dom';
 
+import Lobby from "./pages/Lobby";
 import Game from "./pages/Game";
 
 function App() {
@@ -12,19 +13,16 @@ function App() {
 
   return (
     <HashRouter>
-    <Routes>
-      <Route
-        path="/game"
-        element={<Game />} />
-      <Route
-        path="/"
-        element={ <>
-          <div>Mini App + Vite + TS + React + Wagmi</div>
-          <ConnectMenu />
-          <Game />
-        </>} />
-    </Routes>
-  </HashRouter>
+      <ConnectMenu />
+      <Routes>
+        <Route
+          path="/game"
+          element={<Game />} />
+        <Route
+          path="/"
+          element={<Lobby />} />
+      </Routes>
+    </HashRouter>
   );
 }
 

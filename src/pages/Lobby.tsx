@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // Types
 interface Player {
@@ -25,6 +26,8 @@ interface GameSettings {
 }
 
 const Lobby = ({ }) => {
+  const navigate = useNavigate();
+
   // Sample map templates
   const mapTemplates: MapTemplate[] = [
     {
@@ -132,6 +135,8 @@ const Lobby = ({ }) => {
       addChatMessage("System", "All players must be ready and have selected a faction!");
       return;
     }
+
+    navigate('/game');
   };
 
   return (

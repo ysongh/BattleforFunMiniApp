@@ -9,6 +9,7 @@ interface Unit {
   type: UnitType;
   player: Player;
   hp: number;
+  lastActionTime: number;
 }
 
 interface Tile {
@@ -42,6 +43,7 @@ const TERRAIN_DEFENSE: Record<TerrainType, number> = {
 
 const MAX_ACTION_POINTS = 10;
 const AP_RECOVERY_INTERVAL = 60000; // 1 minute in milliseconds
+const UNIT_COOLDOWN = 60000; // 1 minute cooldown after using a unit
 
 const Game2: React.FC = () => {
   const [gridSize] = useState({ width: 12, height: 10 });
@@ -56,6 +58,7 @@ const Game2: React.FC = () => {
   const [currentPlayer, setCurrentPlayer] = useState<Player>(1);
   const [lastApRecovery, setLastApRecovery] = useState<Record<Player, number>>({ 1: Date.now(), 2: Date.now() });
   const [timeUntilNextAP, setTimeUntilNextAP] = useState<Record<Player, number>>({ 1: 60, 2: 60 });
+  const [unitCooldowns, setUnitCooldowns] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     initializeGrid();
@@ -90,10 +93,13 @@ const Game2: React.FC = () => {
         setActionPoints(newActionPoints);
         setLastApRecovery(newLastApRecovery);
       }
+
+      // Update unit cooldowns display
+      setUnitCooldowns(new Map(unitCooldowns));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [actionPoints, lastApRecovery]);
+  }, [actionPoints, lastApRecovery, unitCooldowns]);
 
   useEffect(() => {
     const incomeInterval = setInterval(() => {
@@ -138,10 +144,10 @@ const Game2: React.FC = () => {
         }
 
         if (x === 2 && y === 2) {
-          unit = { type: 'infantry', player: 1, hp: 100 };
+          unit = { type: 'infantry', player: 1, hp: 100, lastActionTime: 0 };
         }
         if (x === 9 && y === 7) {
-          unit = { type: 'infantry', player: 2, hp: 100 };
+          unit = { type: 'infantry', player: 2, hp: 100, lastActionTime: 0 };
         }
 
         row.push({ terrain, unit, owner });
@@ -151,9 +157,28 @@ const Game2: React.FC = () => {
     setGrid(newGrid);
   };
 
+  const isUnitOnCooldown = (x: number, y: number): boolean => {
+    const unit = grid[y]?.[x]?.unit;
+    if (!unit) return false;
+    
+    const now = Date.now();
+    const timeSinceAction = now - unit.lastActionTime;
+    return timeSinceAction < UNIT_COOLDOWN;
+  };
+
+  const getUnitCooldownTime = (x: number, y: number): number => {
+    const unit = grid[y]?.[x]?.unit;
+    if (!unit) return 0;
+    
+    const now = Date.now();
+    const timeSinceAction = now - unit.lastActionTime;
+    const timeLeft = Math.max(0, UNIT_COOLDOWN - timeSinceAction);
+    return Math.ceil(timeLeft / 1000);
+  };
+
   const calculateValidMoves = (x: number, y: number): boolean[][] => {
     const unit = grid[y][x].unit;
-    if (!unit) return Array(gridSize.height).fill(null).map(() => Array(gridSize.width).fill(false));
+    if (!unit || isUnitOnCooldown(x, y)) return Array(gridSize.height).fill(null).map(() => Array(gridSize.width).fill(false));
 
     const moves: boolean[][] = Array(gridSize.height).fill(null).map(() => Array(gridSize.width).fill(false));
     const visited: boolean[][] = Array(gridSize.height).fill(null).map(() => Array(gridSize.width).fill(false));
@@ -190,7 +215,7 @@ const Game2: React.FC = () => {
 
   const calculateValidAttacks = (x: number, y: number): boolean[][] => {
     const unit = grid[y][x].unit;
-    if (!unit) return Array(gridSize.height).fill(null).map(() => Array(gridSize.width).fill(false));
+    if (!unit || isUnitOnCooldown(x, y)) return Array(gridSize.height).fill(null).map(() => Array(gridSize.width).fill(false));
 
     const attacks: boolean[][] = Array(gridSize.height).fill(null).map(() => Array(gridSize.width).fill(false));
     const stats = UNIT_STATS[unit.type!];
@@ -265,6 +290,7 @@ const Game2: React.FC = () => {
     const newGrid = grid.map(row => row.map(cell => ({ ...cell, unit: cell.unit ? { ...cell.unit } : null })));
     const unit = newGrid[fromY][fromX].unit!;
     
+    unit.lastActionTime = Date.now();
     newGrid[toY][toX].unit = { ...unit };
     newGrid[fromY][fromX].unit = null;
 
@@ -295,6 +321,8 @@ const Game2: React.FC = () => {
       newGrid[toY][toX].unit = null;
     }
 
+    attacker.lastActionTime = Date.now();
+
     setGrid(newGrid);
   };
 
@@ -308,7 +336,8 @@ const Game2: React.FC = () => {
     newGrid[buyMenuCell.y][buyMenuCell.x].unit = {
       type: unitType,
       player: currentPlayer,
-      hp: 100
+      hp: 100,
+      lastActionTime: Date.now()
     };
 
     setGrid(newGrid);
@@ -402,13 +431,18 @@ const Game2: React.FC = () => {
                   `}
                 >
                   {tile.unit && (
-                    <div className={`text-2xl ${tile.unit.player === 1 ? 'filter drop-shadow-[0_0_2px_rgba(59,130,246,1)]' : 'filter drop-shadow-[0_0_2px_rgba(239,68,68,1)]'}`}>
+                    <div className={`text-2xl ${tile.unit.player === 1 ? 'filter drop-shadow-[0_0_2px_rgba(59,130,246,1)]' : 'filter drop-shadow-[0_0_2px_rgba(239,68,68,1)]'} ${isUnitOnCooldown(x, y) ? 'opacity-50' : ''}`}>
                       {getUnitIcon(tile.unit.type)}
                     </div>
                   )}
                   {tile.unit && (
                     <div className="absolute bottom-0 right-0 bg-black bg-opacity-70 text-white text-xs px-1 rounded">
                       {tile.unit.hp}
+                    </div>
+                  )}
+                  {tile.unit && isUnitOnCooldown(x, y) && (
+                    <div className="absolute top-0 left-0 bg-orange-500 bg-opacity-90 text-white text-xs px-1 rounded">
+                      {getUnitCooldownTime(x, y)}s
                     </div>
                   )}
                   {tile.terrain === 'city' && !tile.unit && (
@@ -462,6 +496,8 @@ const Game2: React.FC = () => {
           <h3 className="font-bold mb-2">How to Play:</h3>
           <ul className="text-sm space-y-1 text-gray-300">
             <li>• Each action (move or attack) costs 1 Action Point (AP)</li>
+            <li>• After using a unit, it goes on cooldown for 60 seconds (shown with orange timer)</li>
+            <li>• Units on cooldown appear faded and cannot be used until cooldown expires</li>
             <li>• Action Points regenerate automatically - 1 AP every 60 seconds</li>
             <li>• Maximum of 10 AP per player</li>
             <li>• Click any unit to see movement range (blue) and attack range (red)</li>

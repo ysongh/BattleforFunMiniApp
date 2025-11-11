@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 // Types
 interface Player {
@@ -143,6 +143,10 @@ const Lobby = ({ }) => {
     <div className="bg-gray-100 min-h-screen p-4">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-6">Game Lobby</h1>
+
+        <Link to="/game2">
+          Game 2
+        </Link>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left column - Players */}

@@ -69,7 +69,6 @@ const Lobby = ({ }) => {
   // Game state
   const [players, setPlayers] = useState<Player[]>([
     { id: "p1", name: "Player 1", faction: null, ready: false },
-    { id: "p2", name: "Player 2", faction: null, ready: false },
   ]);
   
   const [gameSettings, setGameSettings] = useState<GameSettings>({

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 // Define types
 type UnitType = 'Infantry' | 'Tank' | 'Artillery' | 'APC';
@@ -85,6 +85,163 @@ const TERRAIN_TYPES: Record<TerrainType, Terrain> = {
     isCity: true 
   },
   Road: { type: 'Road', defenseBonus: 0, movementCost: 0.5 },
+};
+
+// AI Helper Functions
+
+const getAIAttackTargets = (
+  grid: Tile[][],
+  unit: Unit,
+  ux: number,
+  uy: number
+): { unit: Unit; x: number; y: number }[] => {
+  const targets: { unit: Unit; x: number; y: number }[] = [];
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      const u = grid[y][x].unit;
+      if (u && u.player === 'Red') {
+        const dist = Math.abs(x - ux) + Math.abs(y - uy);
+        if (dist <= unit.attackRange) targets.push({ unit: u, x, y });
+      }
+    }
+  }
+  return targets;
+};
+
+const executeAIUnitAction = (
+  grid: Tile[][],
+  unit: Unit,
+  ux: number,
+  uy: number,
+  difficulty: 'easy' | 'medium' | 'hard'
+): void => {
+  const redUnits: { unit: Unit; x: number; y: number }[] = [];
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      const u = grid[y][x].unit;
+      if (u && u.player === 'Red') redUnits.push({ unit: u, x, y });
+    }
+  }
+  if (redUnits.length === 0) return;
+
+  const validMoves: [number, number][] = [];
+  for (let dx = -unit.moveRange; dx <= unit.moveRange; dx++) {
+    for (let dy = -unit.moveRange; dy <= unit.moveRange; dy++) {
+      if (Math.abs(dx) + Math.abs(dy) > unit.moveRange) continue;
+      const nx = ux + dx, ny = uy + dy;
+      if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
+      if (nx === ux && ny === uy) continue;
+      if (grid[ny][nx].unit !== null) continue;
+      validMoves.push([nx, ny]);
+    }
+  }
+
+  let currentX = ux, currentY = uy;
+  let currentUnit = unit;
+
+  if (difficulty === 'easy') {
+    if (validMoves.length > 0) {
+      const [mx, my] = validMoves[Math.floor(Math.random() * validMoves.length)];
+      grid[uy][ux].unit = null;
+      currentUnit = { ...unit, position: [mx, my] as [number, number], hasMoved: true };
+      grid[my][mx].unit = currentUnit;
+      currentX = mx; currentY = my;
+    } else {
+      grid[uy][ux].unit = { ...unit, hasMoved: true };
+      currentUnit = { ...unit, hasMoved: true };
+    }
+  } else {
+    const nearestEnemy = redUnits.reduce((nearest, red) => {
+      const dist = Math.abs(red.x - ux) + Math.abs(red.y - uy);
+      const nearestDist = Math.abs(nearest.x - ux) + Math.abs(nearest.y - uy);
+      return dist < nearestDist ? red : nearest;
+    });
+
+    const canAttackNow =
+      unit.attackRange > 0 &&
+      Math.abs(nearestEnemy.x - ux) + Math.abs(nearestEnemy.y - uy) <= unit.attackRange;
+
+    if (!canAttackNow) {
+      let bestPos: [number, number] | null = null;
+      let bestDist = Math.abs(nearestEnemy.x - ux) + Math.abs(nearestEnemy.y - uy);
+      for (const [nx, ny] of validMoves) {
+        const dist = Math.abs(nx - nearestEnemy.x) + Math.abs(ny - nearestEnemy.y);
+        if (dist < bestDist) { bestDist = dist; bestPos = [nx, ny]; }
+      }
+      if (bestPos) {
+        grid[uy][ux].unit = null;
+        currentUnit = { ...unit, position: bestPos, hasMoved: true };
+        grid[bestPos[1]][bestPos[0]].unit = currentUnit;
+        currentX = bestPos[0]; currentY = bestPos[1];
+      } else {
+        grid[uy][ux].unit = { ...unit, hasMoved: true };
+        currentUnit = { ...unit, hasMoved: true };
+      }
+    } else {
+      grid[uy][ux].unit = { ...unit, hasMoved: true };
+      currentUnit = { ...unit, hasMoved: true };
+    }
+  }
+
+  if (currentUnit.attackRange === 0) return;
+
+  const attackTargets = getAIAttackTargets(grid, currentUnit, currentX, currentY);
+  if (attackTargets.length === 0) return;
+
+  let target: { unit: Unit; x: number; y: number };
+
+  if (difficulty === 'easy') {
+    target = attackTargets[Math.floor(Math.random() * attackTargets.length)];
+  } else if (difficulty === 'hard') {
+    target = attackTargets.reduce((best, t) => {
+      const dmg = calculateDamage(currentUnit, t.unit, grid[t.y][t.x].terrain);
+      const bestDmg = calculateDamage(currentUnit, best.unit, grid[best.y][best.x].terrain);
+      const tScore = t.unit.health <= dmg ? 10000 : 1000 - t.unit.health;
+      const bestScore = best.unit.health <= bestDmg ? 10000 : 1000 - best.unit.health;
+      return tScore > bestScore ? t : best;
+    });
+  } else {
+    target = attackTargets.reduce((weakest, t) =>
+      t.unit.health < weakest.unit.health ? t : weakest
+    );
+  }
+
+  const damage = calculateDamage(currentUnit, target.unit, grid[target.y][target.x].terrain);
+  const newHealth = target.unit.health - damage;
+  grid[currentY][currentX].unit = { ...currentUnit, hasAttacked: true };
+  if (newHealth <= 0) {
+    grid[target.y][target.x].unit = null;
+  } else {
+    grid[target.y][target.x].unit = { ...target.unit, health: newHealth };
+  }
+};
+
+const computeAITurn = (
+  currentGrid: Tile[][],
+  difficulty: 'easy' | 'medium' | 'hard'
+): Tile[][] => {
+  const workingGrid: Tile[][] = currentGrid.map(row =>
+    row.map(tile => ({
+      ...tile,
+      unit: tile.unit ? { ...tile.unit } : null,
+      terrain: { ...tile.terrain },
+    }))
+  );
+
+  const bluePositions: [number, number][] = [];
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      if (workingGrid[y][x].unit?.player === 'Blue') bluePositions.push([x, y]);
+    }
+  }
+
+  for (const [x, y] of bluePositions) {
+    const unit = workingGrid[y][x].unit;
+    if (!unit || unit.player !== 'Blue') continue;
+    executeAIUnitAction(workingGrid, unit, x, y, difficulty);
+  }
+
+  return workingGrid;
 };
 
 // Helper functions
@@ -206,10 +363,74 @@ const Game = () => {
     Red: 1000,
     Blue: 1000,
   });
+  const [isAIEnabled, setIsAIEnabled] = useState(false);
+  const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [isAIThinking, setIsAIThinking] = useState(false);
+  const gridRef = useRef<Tile[][]>([]);
+  const isAIEnabledRef = useRef(false);
+  const aiDifficultyRef = useRef<'easy' | 'medium' | 'hard'>('medium');
+
+  useEffect(() => { gridRef.current = grid; }, [grid]);
+  useEffect(() => { isAIEnabledRef.current = isAIEnabled; }, [isAIEnabled]);
+  useEffect(() => { aiDifficultyRef.current = aiDifficulty; }, [aiDifficulty]);
 
   useEffect(() => {
     initializeGame();
   }, []);
+
+  // AI turn trigger — only depends on currentPlayer to avoid cleanup cancelling the timer
+  useEffect(() => {
+    if (currentPlayer !== 'Blue' || !isAIEnabledRef.current || gridRef.current.length === 0) return;
+
+    setIsAIThinking(true);
+    setGameStatus('AI is thinking...');
+
+    const timer = setTimeout(() => {
+      const newGrid = computeAITurn(gridRef.current, aiDifficultyRef.current);
+
+      // Check win condition
+      let redCount = 0;
+      for (let y = 0; y < GRID_SIZE; y++)
+        for (let x = 0; x < GRID_SIZE; x++)
+          if (newGrid[y]?.[x]?.unit?.player === 'Red') redCount++;
+
+      if (redCount === 0) {
+        setGrid(newGrid);
+        setGameStatus('Blue wins!');
+        setIsAIThinking(false);
+        return;
+      }
+
+      // Reset Blue units and hand turn back to Red
+      const resetGrid = newGrid.map(row =>
+        row.map(tile =>
+          tile.unit?.player === 'Blue'
+            ? { ...tile, unit: { ...tile.unit, hasMoved: false, hasAttacked: false } }
+            : tile
+        )
+      );
+
+      // City income for Red (next player)
+      let cityIncome = 0;
+      for (let y = 0; y < GRID_SIZE; y++)
+        for (let x = 0; x < GRID_SIZE; x++) {
+          const terrain = resetGrid[y][x].terrain;
+          if (terrain.isCity && (terrain as City).owner === 'Red') cityIncome += 100;
+        }
+
+      if (cityIncome > 0) setResources(prev => ({ ...prev, Red: prev.Red + cityIncome }));
+
+      setGrid(resetGrid);
+      setCurrentPlayer('Red');
+      setSelectedUnit(null);
+      setMovementRange([]);
+      setAttackRange([]);
+      setGameStatus("Red's turn");
+      setIsAIThinking(false);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [currentPlayer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeGame = () => {
     const initialGrid = generateInitialGrid();
@@ -364,8 +585,9 @@ const Game = () => {
   };
 
   const handleUnitSelect = (x: number, y: number) => {
+    if (isAIThinking || (currentPlayer === 'Blue' && isAIEnabled)) return;
     const unit = grid[y][x].unit;
-    
+
     if (!unit) {
       setSelectedUnit(null);
       setMovementRange([]);
@@ -400,6 +622,7 @@ const Game = () => {
   };
 
   const handleTileClick = (x: number, y: number) => {
+    if (isAIThinking || (currentPlayer === 'Blue' && isAIEnabled)) return;
     // Handle city capture attempt (when unit is on a capturable tile)
     if (selectedUnit && 
         !selectedUnit.hasAttacked && 
@@ -696,18 +919,47 @@ const Game = () => {
             <p className="text-blue-600 font-bold">Blue: ${resources.Blue}</p>
           </div>
           <div className="flex gap-2 mt-2">
-            <button 
-              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+            <button
+              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
               onClick={endTurn}
+              disabled={isAIThinking}
             >
               End Turn
             </button>
-            <button 
-              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
+            <button
+              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
               onClick={cycleToNextUnit}
+              disabled={isAIThinking}
             >
               Next Unit
             </button>
+          </div>
+          <div className="mt-2 border-t pt-2">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-semibold">AI Opponent (Blue):</span>
+              <button
+                className={`px-2 py-0.5 text-xs rounded ${isAIEnabled ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                onClick={() => setIsAIEnabled(v => !v)}
+              >
+                {isAIEnabled ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            {isAIEnabled && (
+              <div className="flex gap-1">
+                {(['easy', 'medium', 'hard'] as const).map(level => (
+                  <button
+                    key={level}
+                    className={`px-2 py-0.5 text-xs rounded capitalize ${aiDifficulty === level ? 'bg-purple-600 text-white' : 'bg-gray-200'}`}
+                    onClick={() => setAiDifficulty(level)}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            )}
+            {isAIThinking && (
+              <p className="text-xs text-purple-600 mt-1 animate-pulse">AI is thinking...</p>
+            )}
           </div>
         </div>
         

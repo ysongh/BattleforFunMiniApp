@@ -531,30 +531,51 @@ const Game = () => {
   };
 
   const calculateMovementRange = (unit: Unit): [number, number][] => {
-    const [x, y] = unit.position;
-    const range = unit.moveRange;
-    const validMoves: [number, number][] = [];
-    
-    for (let dx = -range; dx <= range; dx++) {
-      for (let dy = -range; dy <= range; dy++) {
-        const nx = x + dx;
-        const ny = y + dy;
-        
-        // Skip if out of bounds
+    const [startX, startY] = unit.position;
+    const budget = unit.moveRange;
+
+    // Dijkstra: find all tiles reachable within the movement budget
+    const costMap = new Map<string, number>();
+    const queue: { x: number; y: number; cost: number }[] = [];
+    const validMovesSet = new Set<string>();
+
+    costMap.set(`${startX},${startY}`, 0);
+    queue.push({ x: startX, y: startY, cost: 0 });
+
+    while (queue.length > 0) {
+      queue.sort((a, b) => a.cost - b.cost);
+      const { x, y, cost } = queue.shift()!;
+
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        const nx = x + dx, ny = y + dy;
         if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
-        
-        // Skip if the tile already has a unit
-        if (grid[ny][nx].unit !== null) continue;
-        
-        // Calculate Manhattan distance
-        const distance = Math.abs(dx) + Math.abs(dy);
-        if (distance <= range) {
-          validMoves.push([nx, ny]);
+
+        const tile = grid[ny][nx];
+        const newCost = cost + tile.terrain.movementCost;
+        if (newCost > budget) continue;
+
+        const key = `${nx},${ny}`;
+        const best = costMap.get(key);
+        if (best !== undefined && best <= newCost) continue;
+        costMap.set(key, newCost);
+
+        const occupant = tile.unit;
+        if (occupant === null) {
+          // Empty tile — can stop here and keep exploring
+          validMovesSet.add(key);
+          queue.push({ x: nx, y: ny, cost: newCost });
+        } else if (occupant.player === unit.player) {
+          // Friendly unit — can pass through but not stop
+          queue.push({ x: nx, y: ny, cost: newCost });
         }
+        // Enemy unit — blocked, don't explore further
       }
     }
-    
-    return validMoves;
+
+    return [...validMovesSet].map(key => {
+      const [kx, ky] = key.split(',').map(Number);
+      return [kx, ky] as [number, number];
+    });
   };
 
   const calculateAttackRange = (unit: Unit): [number, number][] => {

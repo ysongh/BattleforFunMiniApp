@@ -7,6 +7,8 @@ interface Player {
   name: string;
   faction: 'Red' | 'Blue' | 'Yellow' | 'Green' | null;
   ready: boolean;
+  isAI?: boolean;
+  aiDifficulty?: 'easy' | 'medium' | 'hard';
 }
 
 interface MapTemplate {
@@ -119,6 +121,33 @@ const Lobby = ({ }) => {
     setChatMessages([...chatMessages, { sender, text }]);
   };
 
+  const handleAddAIPlayer = () => {
+    if (players.length >= 4) {
+      addChatMessage("System", "Maximum of 4 players reached!");
+      return;
+    }
+    const aiId = `ai${Date.now()}`;
+    const aiNumber = players.filter(p => p.isAI).length + 1;
+    const newAI: Player = {
+      id: aiId,
+      name: `AI Player ${aiNumber}`,
+      faction: null,
+      ready: true,
+      isAI: true,
+      aiDifficulty: 'medium',
+    };
+    setPlayers([...players, newAI]);
+    addChatMessage("System", `AI Player ${aiNumber} joined the lobby.`);
+  };
+
+  const handleRemovePlayer = (playerId: string) => {
+    setPlayers(players.filter(p => p.id !== playerId));
+  };
+
+  const handleAIDifficultyChange = (playerId: string, difficulty: 'easy' | 'medium' | 'hard') => {
+    setPlayers(players.map(p => p.id === playerId ? { ...p, aiDifficulty: difficulty } : p));
+  };
+
   const handleSendChat = (e) => {
     e.preventDefault();
     if (chatInput.trim()) {
@@ -163,15 +192,40 @@ const Lobby = ({ }) => {
                       onChange={(e) => handleNameChange(player.id, e.target.value)}
                       className="border rounded px-2 py-1 w-full mr-2"
                       placeholder="Enter name..."
+                      disabled={player.isAI}
                     />
-                    <button
-                      className={`px-3 py-1 rounded ${player.ready ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
-                      onClick={() => handleReadyToggle(player.id)}
-                    >
-                      {player.ready ? 'Ready' : 'Not Ready'}
-                    </button>
+                    {player.isAI ? (
+                      <button
+                        className="px-3 py-1 rounded bg-red-400 text-white text-sm whitespace-nowrap"
+                        onClick={() => handleRemovePlayer(player.id)}
+                      >
+                        Remove
+                      </button>
+                    ) : (
+                      <button
+                        className={`px-3 py-1 rounded ${player.ready ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
+                        onClick={() => handleReadyToggle(player.id)}
+                      >
+                        {player.ready ? 'Ready' : 'Not Ready'}
+                      </button>
+                    )}
                   </div>
-                  
+
+                  {player.isAI && (
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="text-xs text-gray-500">Difficulty:</span>
+                      {(['easy', 'medium', 'hard'] as const).map(level => (
+                        <button
+                          key={level}
+                          className={`px-2 py-0.5 text-xs rounded capitalize ${player.aiDifficulty === level ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                          onClick={() => handleAIDifficultyChange(player.id, level)}
+                        >
+                          {level}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-4 gap-2">
                     {(['Red', 'Blue', 'Yellow', 'Green'] as const).map(faction => (
                       <button
@@ -185,8 +239,12 @@ const Lobby = ({ }) => {
                   </div>
                 </div>
               ))}
-              
-              <button className="bg-blue-500 text-white px-4 py-2 rounded w-full">
+
+              <button
+                className="bg-blue-500 text-white px-4 py-2 rounded w-full disabled:opacity-50"
+                onClick={handleAddAIPlayer}
+                disabled={players.length >= 4}
+              >
                 Add AI Player
               </button>
             </div>

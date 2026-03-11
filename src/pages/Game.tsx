@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
 // Define types
-type UnitType = 'Infantry' | 'Tank' | 'Artillery' | 'APC';
+type UnitType = 'Infantry' | 'Tank' | 'Artillery';
 type TerrainType = 'Plain' | 'Mountain' | 'Forest' | 'City' | 'Road';
 type Player = 'Red' | 'Blue';
 
@@ -63,14 +63,6 @@ const UNIT_TYPES: Record<UnitType, Omit<Unit, 'id' | 'position' | 'hasMoved' | '
     defense: 5,
     moveRange: 3,
     attackRange: 3,
-  },
-  APC: {
-    type: 'APC',
-    health: 100,
-    attack: 0,
-    defense: 15,
-    moveRange: 6,
-    attackRange: 0,
   },
 };
 
@@ -475,14 +467,14 @@ const Game = () => {
     initialGrid[2][1].unit = createUnit('Tank', [1, 2], 'Red');
     initialGrid[3][2].unit = createUnit('Artillery', [2, 3], 'Red');
     initialGrid[1][4].unit = createUnit('Infantry', [4, 1], 'Red');
-    initialGrid[2][5].unit = createUnit('APC', [5, 2], 'Red');
+    initialGrid[2][5].unit = createUnit('Infantry', [5, 2], 'Red');
     
     // Blue player's units - bottom right corner
     initialGrid[GRID_SIZE - 2][GRID_SIZE - 3].unit = createUnit('Infantry', [GRID_SIZE - 3, GRID_SIZE - 2], 'Blue');
     initialGrid[GRID_SIZE - 3][GRID_SIZE - 2].unit = createUnit('Tank', [GRID_SIZE - 2, GRID_SIZE - 3], 'Blue');
     initialGrid[GRID_SIZE - 4][GRID_SIZE - 3].unit = createUnit('Artillery', [GRID_SIZE - 3, GRID_SIZE - 4], 'Blue');
     initialGrid[GRID_SIZE - 2][GRID_SIZE - 5].unit = createUnit('Infantry', [GRID_SIZE - 5, GRID_SIZE - 2], 'Blue');
-    initialGrid[GRID_SIZE - 3][GRID_SIZE - 6].unit = createUnit('APC', [GRID_SIZE - 6, GRID_SIZE - 3], 'Blue');
+    initialGrid[GRID_SIZE - 3][GRID_SIZE - 6].unit = createUnit('Infantry', [GRID_SIZE - 6, GRID_SIZE - 3], 'Blue');
     
     setGrid(initialGrid);
   };
@@ -1145,7 +1137,6 @@ const Game = () => {
               <p><strong>I</strong>: Infantry - Basic unit</p>
               <p><strong>T</strong>: Tank - Strong attack</p>
               <p><strong>A</strong>: Artillery - Long range</p>
-              <p><strong>P</strong>: APC - Fast movement</p>
             </div>
           </div>
         </div>

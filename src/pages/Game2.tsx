@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Swords, Shield, Target, DollarSign, Flag, Zap } from 'lucide-react';
+import { IconSwords, IconShield, IconTarget, IconCurrencyDollar, IconFlag, IconBolt } from '@tabler/icons-react';
 
 type TerrainType = 'plain' | 'forest' | 'mountain' | 'city' | 'base';
 type UnitType = 'infantry' | 'tank' | 'artillery' | null;
@@ -379,31 +379,31 @@ const Game2: React.FC = () => {
           <div className="flex items-center gap-6">
             <h1 className="text-2xl font-bold text-white">Tactical Wars</h1>
             <div className="flex items-center gap-2">
-              <Flag className={currentPlayer === 1 ? 'text-blue-400' : 'text-red-400'} />
+              <IconFlag className={currentPlayer === 1 ? 'text-blue-400' : 'text-red-400'} />
               <span className="text-white font-bold">Player {currentPlayer}</span>
             </div>
           </div>
           <div className="flex items-center gap-6">
             <div className="flex flex-col items-center">
               <div className="flex items-center gap-2">
-                <Zap className="text-blue-400" />
+                <IconBolt className="text-blue-400" />
                 <span className="text-white font-bold">P1 AP: {actionPoints[1]}/{MAX_ACTION_POINTS}</span>
               </div>
               <span className="text-xs text-gray-400">Next: {timeUntilNextAP[1]}s</span>
             </div>
             <div className="flex flex-col items-center">
               <div className="flex items-center gap-2">
-                <Zap className="text-red-400" />
+                <IconBolt className="text-red-400" />
                 <span className="text-white font-bold">P2 AP: {actionPoints[2]}/{MAX_ACTION_POINTS}</span>
               </div>
               <span className="text-xs text-gray-400">Next: {timeUntilNextAP[2]}s</span>
             </div>
             <div className="flex items-center gap-2">
-              <DollarSign className="text-blue-400" />
+              <IconCurrencyDollar className="text-blue-400" />
               <span className="text-white font-bold">P1: ${gold[1]}</span>
             </div>
             <div className="flex items-center gap-2">
-              <DollarSign className="text-red-400" />
+              <IconCurrencyDollar className="text-red-400" />
               <span className="text-white font-bold">P2: ${gold[2]}</span>
             </div>
             <button

@@ -1,4 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  IconSword,
+  IconShield,
+  IconTarget,
+  IconChevronUp,
+  IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
+  IconHome,
+  IconPlayerTrackNext,
+  IconRobot,
+  IconClock,
+  IconBolt,
+} from '@tabler/icons-react';
 
 // Define types
 type UnitType = 'Infantry' | 'Tank' | 'Artillery';
@@ -37,8 +51,8 @@ interface Tile {
 
 // Game constants
 const GRID_SIZE = 20;
-const COOLDOWN_DURATION = 60000; // 60 seconds
-const AP_REGEN_INTERVAL = 60000; // 1 AP every 60 seconds
+const COOLDOWN_DURATION = 10000; // 10 seconds
+const AP_REGEN_INTERVAL = 20000; // 1 AP every 20 seconds
 const AI_ACTION_INTERVAL = 3000; // AI tries to act every 3 seconds
 const MAX_AP = 10;
 
@@ -105,6 +119,14 @@ const getTerrainColor = (terrain: TerrainType): string => {
 
 const getUnitColor = (player: Player): string => {
   return player === 'Red' ? 'bg-red-500' : 'bg-blue-500';
+};
+
+const getUnitIcon = (type: UnitType) => {
+  switch (type) {
+    case 'Infantry': return <IconSword size={16} stroke={2.5} color="white" />;
+    case 'Tank': return <IconShield size={16} stroke={2.5} color="white" />;
+    case 'Artillery': return <IconTarget size={16} stroke={2.5} color="white" />;
+  }
 };
 
 const generateInitialGrid = (): Tile[][] => {
@@ -808,7 +830,8 @@ const Game = () => {
           {/* AP Display */}
           <div className="mb-2">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-semibold text-red-600">Red AP:</span>
+              <IconBolt size={14} className="text-red-600" />
+              <span className="text-xs font-semibold text-red-600">Red:</span>
               <div className="flex gap-0.5">
                 {Array.from({ length: MAX_AP }).map((_, i) => (
                   <div
@@ -820,7 +843,8 @@ const Game = () => {
               <span className="text-xs font-bold text-red-600">{actionPoints.Red}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-blue-600">Blue AP:</span>
+              <IconBolt size={14} className="text-blue-600" />
+              <span className="text-xs font-semibold text-blue-600">Blue:</span>
               <div className="flex gap-0.5">
                 {Array.from({ length: MAX_AP }).map((_, i) => (
                   <div
@@ -835,19 +859,20 @@ const Game = () => {
 
           <div className="flex gap-2 mt-2">
             <button
-              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
+              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
               onClick={cycleToNextUnit}
             >
-              Next Unit
+              <IconPlayerTrackNext size={14} /> Next Unit
             </button>
           </div>
 
           {/* AI Controls */}
           <div className="mt-2 border-t pt-2">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-semibold">AI Opponent (Blue):</span>
+              <IconRobot size={14} className="text-gray-600" />
+              <span className="text-xs font-semibold">AI (Blue):</span>
               <button
-                className={`px-2 py-0.5 text-xs rounded ${isAIEnabled ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                className={`px-2 py-0.5 text-xs rounded flex items-center gap-1 ${isAIEnabled ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
                 onClick={() => setIsAIEnabled(v => !v)}
               >
                 {isAIEnabled ? 'ON' : 'OFF'}
@@ -874,19 +899,19 @@ const Game = () => {
           <h3 className="text-sm font-semibold mb-1">Navigation:</h3>
           <div className="grid grid-cols-3 gap-1">
             <div></div>
-            <button className="bg-gray-200 hover:bg-gray-300 p-1 rounded" onClick={() => moveViewport(0, -1)}>↑</button>
+            <button className="bg-gray-200 hover:bg-gray-300 p-1 rounded flex items-center justify-center" onClick={() => moveViewport(0, -1)}><IconChevronUp size={16} /></button>
             <div></div>
-            <button className="bg-gray-200 hover:bg-gray-300 p-1 rounded" onClick={() => moveViewport(-1, 0)}>←</button>
+            <button className="bg-gray-200 hover:bg-gray-300 p-1 rounded flex items-center justify-center" onClick={() => moveViewport(-1, 0)}><IconChevronLeft size={16} /></button>
             <button
-              className="bg-gray-200 hover:bg-gray-300 p-1 rounded"
+              className="bg-gray-200 hover:bg-gray-300 p-1 rounded flex items-center justify-center"
               onClick={() => {
                 const units = findRedUnits();
                 if (units.length > 0) centerViewportOn(units[0][0], units[0][1]);
               }}
-            >⌂</button>
-            <button className="bg-gray-200 hover:bg-gray-300 p-1 rounded" onClick={() => moveViewport(1, 0)}>→</button>
+            ><IconHome size={16} /></button>
+            <button className="bg-gray-200 hover:bg-gray-300 p-1 rounded flex items-center justify-center" onClick={() => moveViewport(1, 0)}><IconChevronRight size={16} /></button>
             <div></div>
-            <button className="bg-gray-200 hover:bg-gray-300 p-1 rounded" onClick={() => moveViewport(0, 1)}>↓</button>
+            <button className="bg-gray-200 hover:bg-gray-300 p-1 rounded flex items-center justify-center" onClick={() => moveViewport(0, 1)}><IconChevronDown size={16} /></button>
             <div></div>
           </div>
           <div className="mt-1 text-xs text-center">
@@ -946,16 +971,14 @@ const Game = () => {
                       ${selectedUnit && selectedUnit.id === tileUnit.id ? 'ring-2 ring-yellow-300' : ''}
                     `}
                   >
-                    <div className="text-xs font-bold text-white">
-                      {tileUnit.type.charAt(0)}
-                    </div>
+                    {getUnitIcon(tileUnit.type)}
                     <div className="absolute bottom-0 right-0 text-xs bg-black bg-opacity-50 text-white px-1 rounded">
                       {tileUnit.health}
                     </div>
                     {/* Cooldown timer overlay */}
                     {onCooldown && (
-                      <div className="absolute top-0 left-0 right-0 bg-orange-500 bg-opacity-80 text-white text-center text-xs font-bold rounded-t-full">
-                        {cooldownSecs}s
+                      <div className="absolute top-0 left-0 right-0 bg-orange-500 bg-opacity-80 text-white text-center text-xs font-bold rounded-t-full flex items-center justify-center gap-px">
+                        <IconClock size={10} />{cooldownSecs}
                       </div>
                     )}
                   </div>
@@ -997,10 +1020,10 @@ const Game = () => {
           </div>
           <div>
             <h3 className="font-semibold text-sm">Unit Types:</h3>
-            <div className="text-xs">
-              <p><strong>I</strong>: Infantry - Basic unit</p>
-              <p><strong>T</strong>: Tank - Strong attack</p>
-              <p><strong>A</strong>: Artillery - Long range</p>
+            <div className="text-xs space-y-0.5">
+              <p className="flex items-center gap-1"><IconSword size={12} /> Infantry - Basic unit</p>
+              <p className="flex items-center gap-1"><IconShield size={12} /> Tank - Strong attack</p>
+              <p className="flex items-center gap-1"><IconTarget size={12} /> Artillery - Long range</p>
             </div>
           </div>
         </div>

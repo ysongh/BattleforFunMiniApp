@@ -210,7 +210,8 @@ const Game = () => {
   const [now, setNow] = useState(Date.now());
 
   // Capture menu state: shown when Infantry lands on a capturable city
-  const [captureMenu, setCaptureMenu] = useState<{ unit: Unit; x: number; y: number } | null>(null);
+  // justMoved: true if the unit moved here (already spent 1 AP), false if already standing here
+  const [captureMenu, setCaptureMenu] = useState<{ unit: Unit; x: number; y: number; justMoved: boolean } | null>(null);
 
   // AI state
   const [isAIEnabled, setIsAIEnabled] = useState(false);
@@ -569,6 +570,17 @@ const Game = () => {
     setSelectedUnit(unit);
     centerViewportOn(x, y);
 
+    // If Infantry is already on a capturable city, show capture menu
+    const tile = grid[y][x];
+    if (unit.type === 'Infantry' && tile.terrain.isCity) {
+      const city = tile.terrain as City;
+      if (!city.owner || city.owner !== unit.player) {
+        setCaptureMenu({ unit, x, y, justMoved: false });
+        setGameStatus('Capture this city or continue?');
+        return;
+      }
+    }
+
     const moveRange = calculateMovementRange(unit);
     setMovementRange(moveRange);
 
@@ -657,7 +669,7 @@ const Game = () => {
       const city = destTile.terrain as City;
       if (!city.owner || city.owner !== unit.player) {
         // Show capture menu — don't start cooldown yet
-        setCaptureMenu({ unit: updatedUnit, x, y });
+        setCaptureMenu({ unit: updatedUnit, x, y, justMoved: true });
         setGameStatus('Capture this city or wait?');
         return;
       }
@@ -707,10 +719,22 @@ const Game = () => {
 
   const handleWait = () => {
     if (!captureMenu) return;
-    const { unit } = captureMenu;
-    setUnitCooldowns(prev => ({ ...prev, [unit.id]: Date.now() + COOLDOWN_DURATION }));
+    const { unit, justMoved } = captureMenu;
     setCaptureMenu(null);
-    setGameStatus(`${unit.type} is waiting`);
+
+    if (justMoved) {
+      // Unit already spent AP on movement — start cooldown
+      setUnitCooldowns(prev => ({ ...prev, [unit.id]: Date.now() + COOLDOWN_DURATION }));
+      setGameStatus(`${unit.type} is waiting`);
+    } else {
+      // Unit was already here — show move/attack options instead
+      const moveRange = calculateMovementRange(unit);
+      const atkRange = calculateAttackRange(unit);
+      setSelectedUnit(unit);
+      setMovementRange(moveRange);
+      setAttackRange(atkRange);
+      setGameStatus('Move or attack (each costs 1 AP)');
+    }
   };
 
   // --- Attack (costs 1 AP, starts cooldown) ---

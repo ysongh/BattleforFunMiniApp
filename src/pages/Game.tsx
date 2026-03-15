@@ -209,6 +209,9 @@ const Game = () => {
   const [unitCooldowns, setUnitCooldowns] = useState<Record<string, number>>({});
   const [now, setNow] = useState(Date.now());
 
+  // Capture menu state: shown when Infantry lands on a capturable city
+  const [captureMenu, setCaptureMenu] = useState<{ unit: Unit; x: number; y: number } | null>(null);
+
   // AI state
   const [isAIEnabled, setIsAIEnabled] = useState(false);
   const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
@@ -468,50 +471,6 @@ const Game = () => {
     return Math.ceil((cd - now) / 1000);
   };
 
-  // --- City capture ---
-
-  const captureCity = (unit: Unit, x: number, y: number) => {
-    const tile = grid[y][x];
-    if (!tile.terrain.isCity) return false;
-
-    const city = tile.terrain as City;
-
-    if (city.owner && city.owner !== unit.player) {
-      city.captureProgress = 0;
-    }
-
-    const captureAmount = unit.type === 'Infantry' ? 50 : 0;
-
-    if (captureAmount > 0) {
-      if (actionPoints.Red <= 0) {
-        setGameStatus('No AP! Wait for regeneration');
-        return false;
-      }
-
-      city.captureProgress += captureAmount;
-
-      if (city.captureProgress >= 100) {
-        city.owner = unit.player;
-        city.captureProgress = 0;
-        setGameStatus(`${unit.player} captured a city!`);
-      } else {
-        setGameStatus(`Capturing: ${city.captureProgress}%`);
-      }
-
-      const updatedGrid = [...grid];
-      updatedGrid[y][x].terrain = city;
-      setGrid(updatedGrid);
-
-      setActionPoints(prev => ({ ...prev, Red: prev.Red - 1 }));
-      setUnitCooldowns(prev => ({ ...prev, [unit.id]: Date.now() + COOLDOWN_DURATION }));
-      setSelectedUnit(null);
-      setMovementRange([]);
-      setAttackRange([]);
-      return true;
-    }
-
-    return false;
-  };
 
   // --- Movement range (Dijkstra) ---
 
@@ -624,18 +583,7 @@ const Game = () => {
   };
 
   const handleTileClick = (x: number, y: number) => {
-    // City capture: selected unit on a capturable city tile
-    if (
-      selectedUnit &&
-      selectedUnit.position[0] === x &&
-      selectedUnit.position[1] === y &&
-      grid[y][x].terrain.isCity
-    ) {
-      const city = grid[y][x].terrain as City;
-      if (!city.owner || city.owner !== selectedUnit.player) {
-        if (captureCity(selectedUnit, x, y)) return;
-      }
-    }
+    if (captureMenu) return; // Block interaction while capture menu is open
 
     if (!selectedUnit) {
       if (grid[y][x].unit?.player === 'Red') {
@@ -695,12 +643,74 @@ const Game = () => {
 
     setGrid(updatedGrid);
     setActionPoints(prev => ({ ...prev, Red: prev.Red - 1 }));
-    setUnitCooldowns(prev => ({ ...prev, [unit.id]: Date.now() + COOLDOWN_DURATION }));
     setSelectedUnit(null);
     setMovementRange([]);
     setAttackRange([]);
     centerViewportOn(x, y);
-    setGameStatus(`${unit.type} moved (60s cooldown)`);
+
+    // Check if Infantry landed on a capturable city
+    const destTile = updatedGrid[y][x];
+    if (
+      unit.type === 'Infantry' &&
+      destTile.terrain.isCity
+    ) {
+      const city = destTile.terrain as City;
+      if (!city.owner || city.owner !== unit.player) {
+        // Show capture menu — don't start cooldown yet
+        setCaptureMenu({ unit: updatedUnit, x, y });
+        setGameStatus('Capture this city or wait?');
+        return;
+      }
+    }
+
+    // No capture opportunity — start cooldown
+    setUnitCooldowns(prev => ({ ...prev, [unit.id]: Date.now() + COOLDOWN_DURATION }));
+    setGameStatus(`${unit.type} moved`);
+  };
+
+  // --- Capture menu handlers ---
+
+  const handleCapture = () => {
+    if (!captureMenu) return;
+    const { unit, x, y } = captureMenu;
+
+    if (actionPoints.Red <= 0) {
+      setGameStatus('No AP to capture! Wait for regeneration');
+      return;
+    }
+
+    const updatedGrid = [...grid];
+    const city = updatedGrid[y][x].terrain as City;
+
+    // Reset progress if switching ownership
+    if (city.owner && city.owner !== unit.player) {
+      city.captureProgress = 0;
+    }
+
+    const captureAmount = Math.floor(unit.health / 10);
+    city.captureProgress += captureAmount;
+
+    if (city.captureProgress >= 20) {
+      city.owner = unit.player;
+      city.captureProgress = 0;
+      setGameStatus(`${unit.player} captured a city!`);
+    } else {
+      setGameStatus(`Capturing: ${city.captureProgress}/20`);
+    }
+
+    updatedGrid[y][x].terrain = city;
+    setGrid(updatedGrid);
+    setActionPoints(prev => ({ ...prev, Red: prev.Red - 1 }));
+    setUnitCooldowns(prev => ({ ...prev, [unit.id]: Date.now() + COOLDOWN_DURATION }));
+    setCaptureMenu(null);
+  };
+
+  const handleWait = () => {
+    if (!captureMenu) return;
+    const { unit } = captureMenu;
+    setUnitCooldowns(prev => ({ ...prev, [unit.id]: Date.now() + COOLDOWN_DURATION }));
+    setCaptureMenu(null);
+    setGameStatus(`${unit.type} is waiting`);
   };
 
   // --- Attack (costs 1 AP, starts cooldown) ---
@@ -990,7 +1000,7 @@ const Game = () => {
                       <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-600">
                         <div
                           className="h-full bg-yellow-500"
-                          style={{ width: `${(tile.terrain as City).captureProgress}%` }}
+                          style={{ width: `${Math.min(100, ((tile.terrain as City).captureProgress / 20) * 100)}%` }}
                         />
                       </div>
                     )}
@@ -1005,6 +1015,39 @@ const Game = () => {
           })
         )}
       </div>
+
+      {/* Capture Menu Modal */}
+      {captureMenu && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-4 w-64">
+            <h3 className="font-bold text-sm mb-2">City Capture</h3>
+            <p className="text-xs text-gray-600 mb-1">
+              Infantry HP: {captureMenu.unit.health} → Capture points: {Math.floor(captureMenu.unit.health / 10)}
+            </p>
+            <p className="text-xs text-gray-600 mb-3">
+              Progress: {(grid[captureMenu.y]?.[captureMenu.x]?.terrain as City)?.captureProgress ?? 0}/20
+            </p>
+            <div className="flex gap-2">
+              <button
+                className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm font-semibold disabled:opacity-50"
+                onClick={handleCapture}
+                disabled={actionPoints.Red <= 0}
+              >
+                Capture (1 AP)
+              </button>
+              <button
+                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-2 rounded text-sm font-semibold"
+                onClick={handleWait}
+              >
+                Wait
+              </button>
+            </div>
+            {actionPoints.Red <= 0 && (
+              <p className="text-xs text-red-500 mt-1">No AP available!</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* How to Play */}
       <div className="mt-2 bg-white p-2 rounded shadow w-full max-w-md">

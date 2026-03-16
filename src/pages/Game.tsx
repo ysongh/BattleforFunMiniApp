@@ -955,7 +955,7 @@ const Game = () => {
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-10 gap-px border-2 border-gray-400 p-1 bg-gray-200">
+      <div className="grid grid-cols-10 gap-px border-2 border-gray-400 p-1 bg-gray-200 overflow-visible">
         {visibleGrid().map((row, relY) =>
           row.map((tile, relX) => {
             const absoluteX = viewportPosition[0] + relX;
@@ -982,8 +982,7 @@ const Game = () => {
                   ${getTerrainColor(tile.terrain.type)}
                   ${highlightClass}
                   cursor-pointer
-                  transition-all duration-200
-                  hover:brightness-110
+                  ${!captureMenu ? 'transition-all duration-200 hover:brightness-110' : ''}
                 `}
                 onClick={() => handleTileClick(absoluteX, absoluteY)}
               >
@@ -1031,6 +1030,34 @@ const Game = () => {
                   </div>
                 )}
 
+                {/* Capture dropdown anchored to tile */}
+                {captureMenu && captureMenu.x === absoluteX && captureMenu.y === absoluteY && (
+                  <div
+                    className="absolute top-full left-1/2 -translate-x-1/2 pt-0 z-50"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="bg-white rounded shadow-lg border border-gray-300 p-2 w-40">
+                      <p className="text-xs text-gray-600 mb-1 whitespace-nowrap">
+                        Capture: {(grid[captureMenu.y]?.[captureMenu.x]?.terrain as City)?.captureProgress ?? 0}/20 (+{Math.floor(captureMenu.unit.health / 10)})
+                      </p>
+                      <button
+                        className="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-semibold mb-1 disabled:opacity-50"
+                        onClick={handleCapture}
+                        disabled={actionPoints.Red <= 0}
+                      >
+                        Capture (1 AP)
+                      </button>
+                      <button
+                        className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded text-xs font-semibold"
+                        onClick={handleWait}
+                      >
+                        {captureMenu.justMoved ? 'Wait' : 'Cancel'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="absolute top-0 left-0 text-xs text-gray-700 opacity-50">
                   {absoluteX},{absoluteY}
                 </div>
@@ -1040,38 +1067,7 @@ const Game = () => {
         )}
       </div>
 
-      {/* Capture Menu Modal */}
-      {captureMenu && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-4 w-64">
-            <h3 className="font-bold text-sm mb-2">City Capture</h3>
-            <p className="text-xs text-gray-600 mb-1">
-              Infantry HP: {captureMenu.unit.health} → Capture points: {Math.floor(captureMenu.unit.health / 10)}
-            </p>
-            <p className="text-xs text-gray-600 mb-3">
-              Progress: {(grid[captureMenu.y]?.[captureMenu.x]?.terrain as City)?.captureProgress ?? 0}/20
-            </p>
-            <div className="flex gap-2">
-              <button
-                className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm font-semibold disabled:opacity-50"
-                onClick={handleCapture}
-                disabled={actionPoints.Red <= 0}
-              >
-                Capture (1 AP)
-              </button>
-              <button
-                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-2 rounded text-sm font-semibold"
-                onClick={handleWait}
-              >
-                Wait
-              </button>
-            </div>
-            {actionPoints.Red <= 0 && (
-              <p className="text-xs text-red-500 mt-1">No AP available!</p>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Capture Menu - inline dropdown anchored to the tile */}
 
       {/* How to Play */}
       <div className="mt-2 bg-white p-2 rounded shadow w-full max-w-md">

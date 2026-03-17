@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import type { UnitType, TerrainType, Player, City, Terrain, Unit, Tile } from '../types/game';
 import {
   IconSword,
   IconShield,
@@ -14,41 +15,6 @@ import {
   IconClock,
   IconBolt,
 } from '@tabler/icons-react';
-
-// Define types
-type UnitType = 'Infantry' | 'Tank' | 'Artillery';
-type TerrainType = 'Plain' | 'Mountain' | 'Forest' | 'City' | 'Road';
-type Player = 'Red' | 'Blue';
-
-interface City extends Terrain {
-  owner: Player | null;
-  captureProgress: number;
-}
-
-interface Unit {
-  id: string;
-  type: UnitType;
-  health: number;
-  attack: number;
-  defense: number;
-  moveRange: number;
-  attackRange: number;
-  position: [number, number];
-  player: Player;
-}
-
-interface Terrain {
-  type: TerrainType;
-  defenseBonus: number;
-  movementCost: number;
-  isCity?: boolean;
-}
-
-interface Tile {
-  position: [number, number];
-  terrain: Terrain;
-  unit: Unit | null;
-}
 
 // Game constants
 const GRID_SIZE = 10;

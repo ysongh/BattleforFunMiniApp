@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   IconSword,
   IconShield,
@@ -50,7 +51,7 @@ interface Tile {
 }
 
 // Game constants
-const GRID_SIZE = 20;
+const GRID_SIZE = 10;
 const COOLDOWN_DURATION = 10000; // 10 seconds
 const AP_REGEN_INTERVAL = 20000; // 1 AP every 20 seconds
 const AI_ACTION_INTERVAL = 3000; // AI tries to act every 3 seconds
@@ -195,6 +196,9 @@ const calculateDamage = (attacker: Unit, defender: Unit, defenderTerrain: Terrai
 };
 
 const Game = () => {
+  const location = useLocation();
+  const lobbyState = location.state as { isAIEnabled?: boolean; aiDifficulty?: 'easy' | 'medium' | 'hard' } | null;
+
   const [grid, setGrid] = useState<Tile[][]>([]);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [movementRange, setMovementRange] = useState<[number, number][]>([]);
@@ -214,8 +218,8 @@ const Game = () => {
   const [captureMenu, setCaptureMenu] = useState<{ unit: Unit; x: number; y: number; justMoved: boolean } | null>(null);
 
   // AI state
-  const [isAIEnabled, setIsAIEnabled] = useState(false);
-  const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [isAIEnabled, setIsAIEnabled] = useState(lobbyState?.isAIEnabled ?? false);
+  const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>(lobbyState?.aiDifficulty ?? 'medium');
 
   // Refs for use inside intervals (avoids stale closures)
   const gridRef = useRef<Tile[][]>([]);

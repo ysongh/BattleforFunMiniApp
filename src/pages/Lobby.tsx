@@ -164,7 +164,14 @@ const Lobby = ({ }) => {
       return;
     }
 
-    navigate('/game');
+    const hasAIPlayer = players.some(p => p.isAI);
+    const aiPlayer = players.find(p => p.isAI);
+    navigate('/game', {
+      state: {
+        isAIEnabled: hasAIPlayer,
+        aiDifficulty: aiPlayer?.aiDifficulty ?? 'medium',
+      },
+    });
   };
 
   return (

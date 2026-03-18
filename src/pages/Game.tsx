@@ -179,9 +179,14 @@ const Game = () => {
   const [unitCooldowns, setUnitCooldowns] = useState<Record<string, number>>({});
   const [now, setNow] = useState(Date.now());
 
-  // Capture menu state: shown when Infantry lands on a capturable city
-  // justMoved: true if the unit moved here (already spent 1 AP), false if already standing here
-  const [captureMenu, setCaptureMenu] = useState<{ unit: Unit; x: number; y: number; justMoved: boolean } | null>(null);
+  // Action menu state: shown after moving near enemies or onto a capturable city
+  // canCapture: true if Infantry on a capturable city
+  // enemies: attackable enemy units nearby
+  const [actionMenu, setActionMenu] = useState<{
+    unit: Unit; x: number; y: number; justMoved: boolean;
+    canCapture: boolean;
+    enemies: { unit: Unit; x: number; y: number }[];
+  } | null>(null);
 
   // AI state
   const [isAIEnabled, setIsAIEnabled] = useState(lobbyState?.isAIEnabled ?? false);
@@ -510,6 +515,24 @@ const Game = () => {
     return validAttacks;
   };
 
+  // Find enemy units within attack range from a given position
+  const findEnemiesInRange = (unit: Unit, ux: number, uy: number): { unit: Unit; x: number; y: number }[] => {
+    const enemies: { unit: Unit; x: number; y: number }[] = [];
+    if (unit.attackRange <= 0) return enemies;
+    for (let dy = -unit.attackRange; dy <= unit.attackRange; dy++) {
+      for (let dx = -unit.attackRange; dx <= unit.attackRange; dx++) {
+        const nx = ux + dx, ny = uy + dy;
+        if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
+        if (Math.abs(dx) + Math.abs(dy) > unit.attackRange) continue;
+        const target = grid[ny]?.[nx]?.unit;
+        if (target && target.player !== unit.player) {
+          enemies.push({ unit: target, x: nx, y: ny });
+        }
+      }
+    }
+    return enemies;
+  };
+
   // --- Selection & interaction ---
 
   const handleUnitSelect = (x: number, y: number) => {
@@ -540,15 +563,16 @@ const Game = () => {
     setSelectedUnit(unit);
     centerViewportOn(x, y);
 
-    // If Infantry is already on a capturable city, show capture menu
+    // Check for nearby actions: capture or attack
     const tile = grid[y][x];
-    if (unit.type === 'Infantry' && tile.terrain.isCity) {
-      const city = tile.terrain as City;
-      if (!city.owner || city.owner !== unit.player) {
-        setCaptureMenu({ unit, x, y, justMoved: false });
-        setGameStatus('Capture this city or continue?');
-        return;
-      }
+    const canCapture = unit.type === 'Infantry' && !!tile.terrain.isCity &&
+      (!((tile.terrain as City).owner) || (tile.terrain as City).owner !== unit.player);
+    const nearbyEnemies = findEnemiesInRange(unit, x, y);
+
+    if (canCapture || nearbyEnemies.length > 0) {
+      setActionMenu({ unit, x, y, justMoved: false, canCapture, enemies: nearbyEnemies });
+      setGameStatus(canCapture ? 'Capture, attack, or continue?' : 'Attack or continue?');
+      return;
     }
 
     const moveRange = calculateMovementRange(unit);
@@ -565,7 +589,7 @@ const Game = () => {
   };
 
   const handleTileClick = (x: number, y: number) => {
-    if (captureMenu) return; // Block interaction while capture menu is open
+    if (actionMenu) return; // Block interaction while capture menu is open
 
     if (!selectedUnit) {
       if (grid[y][x].unit?.player === 'Red') {
@@ -630,22 +654,36 @@ const Game = () => {
     setAttackRange([]);
     centerViewportOn(x, y);
 
-    // Check if Infantry landed on a capturable city
+    // Check for actions after moving: capture city or attack nearby enemies
     const destTile = updatedGrid[y][x];
-    if (
-      unit.type === 'Infantry' &&
-      destTile.terrain.isCity
-    ) {
-      const city = destTile.terrain as City;
-      if (!city.owner || city.owner !== unit.player) {
-        // Show capture menu — don't start cooldown yet
-        setCaptureMenu({ unit: updatedUnit, x, y, justMoved: true });
-        setGameStatus('Capture this city or wait?');
-        return;
+    const canCapture = updatedUnit.type === 'Infantry' && !!destTile.terrain.isCity &&
+      (!(destTile.terrain as City).owner || (destTile.terrain as City).owner !== updatedUnit.player);
+
+    // Find enemies in attack range from new position (use updatedGrid)
+    const nearbyEnemies: { unit: Unit; x: number; y: number }[] = [];
+    if (updatedUnit.attackRange > 0) {
+      for (let dy = -updatedUnit.attackRange; dy <= updatedUnit.attackRange; dy++) {
+        for (let dx = -updatedUnit.attackRange; dx <= updatedUnit.attackRange; dx++) {
+          const nx = x + dx, ny2 = y + dy;
+          if (nx < 0 || nx >= GRID_SIZE || ny2 < 0 || ny2 >= GRID_SIZE) continue;
+          if (Math.abs(dx) + Math.abs(dy) > updatedUnit.attackRange) continue;
+          const target = updatedGrid[ny2]?.[nx]?.unit;
+          if (target && target.player !== updatedUnit.player) {
+            nearbyEnemies.push({ unit: target, x: nx, y: ny2 });
+          }
+        }
       }
     }
 
-    // No capture opportunity — start cooldown
+    if (canCapture || nearbyEnemies.length > 0) {
+      setActionMenu({ unit: updatedUnit, x, y, justMoved: true, canCapture, enemies: nearbyEnemies });
+      setGameStatus(canCapture && nearbyEnemies.length > 0
+        ? 'Capture, attack, or wait?'
+        : canCapture ? 'Capture or wait?' : 'Attack or wait?');
+      return;
+    }
+
+    // No actions available — start cooldown
     setUnitCooldowns(prev => ({ ...prev, [unit.id]: Date.now() + COOLDOWN_DURATION }));
     setGameStatus(`${unit.type} moved`);
   };
@@ -653,8 +691,8 @@ const Game = () => {
   // --- Capture menu handlers ---
 
   const handleCapture = () => {
-    if (!captureMenu) return;
-    const { unit, x, y } = captureMenu;
+    if (!actionMenu) return;
+    const { unit, x, y } = actionMenu;
 
     if (actionPoints.Red <= 0) {
       setGameStatus('No AP to capture! Wait for regeneration');
@@ -684,13 +722,13 @@ const Game = () => {
     setGrid(updatedGrid);
     setActionPoints(prev => ({ ...prev, Red: prev.Red - 1 }));
     setUnitCooldowns(prev => ({ ...prev, [unit.id]: Date.now() + COOLDOWN_DURATION }));
-    setCaptureMenu(null);
+    setActionMenu(null);
   };
 
   const handleWait = () => {
-    if (!captureMenu) return;
-    const { unit, justMoved } = captureMenu;
-    setCaptureMenu(null);
+    if (!actionMenu) return;
+    const { unit, justMoved } = actionMenu;
+    setActionMenu(null);
 
     if (justMoved) {
       // Unit already spent AP on movement — start cooldown
@@ -704,6 +742,48 @@ const Game = () => {
       setMovementRange(moveRange);
       setAttackRange(atkRange);
       setGameStatus('Move or attack (each costs 1 AP)');
+    }
+  };
+
+  const handleAttackFromMenu = (enemyX: number, enemyY: number) => {
+    if (!actionMenu) return;
+    const { unit, justMoved } = actionMenu;
+
+    if (actionPoints.Red <= 0) {
+      setGameStatus('No AP to attack!');
+      return;
+    }
+
+    const updatedGrid = [...grid];
+    const defender = updatedGrid[enemyY][enemyX].unit!;
+    const terrain = updatedGrid[enemyY][enemyX].terrain;
+    const damage = calculateDamage(unit, defender, terrain);
+    const updatedDefender = { ...defender, health: defender.health - damage };
+
+    if (updatedDefender.health <= 0) {
+      updatedGrid[enemyY][enemyX].unit = null;
+      setGameStatus(`${defender.type} destroyed!`);
+    } else {
+      updatedGrid[enemyY][enemyX].unit = updatedDefender;
+      setGameStatus(`${defender.type} took ${damage} damage!`);
+    }
+
+    setGrid(updatedGrid);
+    // Only deduct AP if the unit didn't already spend AP on moving
+    if (!justMoved) {
+      setActionPoints(prev => ({ ...prev, Red: prev.Red - 1 }));
+    }
+    setUnitCooldowns(prev => ({ ...prev, [unit.id]: Date.now() + COOLDOWN_DURATION }));
+    setActionMenu(null);
+
+    // Check win condition
+    let blueCount = 0;
+    for (let cy = 0; cy < GRID_SIZE; cy++)
+      for (let cx = 0; cx < GRID_SIZE; cx++)
+        if (updatedGrid[cy]?.[cx]?.unit?.player === 'Blue') blueCount++;
+    if (blueCount === 0) {
+      setGameStatus('Red wins!');
+      gameOverRef.current = true;
     }
   };
 
@@ -952,7 +1032,7 @@ const Game = () => {
                   ${getTerrainColor(tile.terrain.type)}
                   ${highlightClass}
                   cursor-pointer
-                  ${!captureMenu ? 'transition-all duration-200 hover:brightness-110' : ''}
+                  ${!actionMenu ? 'transition-all duration-200 hover:brightness-110' : ''}
                 `}
                 onClick={() => handleTileClick(absoluteX, absoluteY)}
               >
@@ -1000,29 +1080,47 @@ const Game = () => {
                   </div>
                 )}
 
-                {/* Capture dropdown anchored to tile */}
-                {captureMenu && captureMenu.x === absoluteX && captureMenu.y === absoluteY && (
+                {/* Action dropdown anchored to tile */}
+                {actionMenu && actionMenu.x === absoluteX && actionMenu.y === absoluteY && (
                   <div
                     className="absolute top-full left-1/2 -translate-x-1/2 pt-0 z-50"
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
-                    <div className="bg-white rounded shadow-lg border border-gray-300 p-2 w-40">
-                      <p className="text-xs text-gray-600 mb-1 whitespace-nowrap">
-                        Capture: {(grid[captureMenu.y]?.[captureMenu.x]?.terrain as City)?.captureProgress ?? 0}/20 (+{Math.floor(captureMenu.unit.health / 10)})
-                      </p>
-                      <button
-                        className="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-semibold mb-1 disabled:opacity-50"
-                        onClick={handleCapture}
-                        disabled={actionPoints.Red <= 0}
-                      >
-                        Capture (1 AP)
-                      </button>
+                    <div className="bg-white rounded shadow-lg border border-gray-300 p-2 w-44 space-y-1">
+                      {/* Capture option */}
+                      {actionMenu.canCapture && (
+                        <>
+                          <p className="text-xs text-gray-600 whitespace-nowrap">
+                            Capture: {(grid[actionMenu.y]?.[actionMenu.x]?.terrain as City)?.captureProgress ?? 0}/20 (+{Math.floor(actionMenu.unit.health / 10)})
+                          </p>
+                          <button
+                            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-semibold disabled:opacity-50"
+                            onClick={handleCapture}
+                            disabled={actionPoints.Red <= 0}
+                          >
+                            Capture {actionMenu.justMoved ? '' : '(1 AP)'}
+                          </button>
+                        </>
+                      )}
+                      {/* Attack options */}
+                      {actionMenu.enemies.map((enemy) => (
+                        <button
+                          key={enemy.unit.id}
+                          className="w-full bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-semibold disabled:opacity-50 flex items-center justify-between"
+                          onClick={() => handleAttackFromMenu(enemy.x, enemy.y)}
+                          disabled={actionPoints.Red <= 0 && !actionMenu.justMoved}
+                        >
+                          <span>Attack {enemy.unit.type}</span>
+                          <span className="text-red-200">{enemy.unit.health}hp</span>
+                        </button>
+                      ))}
+                      {/* Wait / Cancel */}
                       <button
                         className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded text-xs font-semibold"
                         onClick={handleWait}
                       >
-                        {captureMenu.justMoved ? 'Wait' : 'Cancel'}
+                        {actionMenu.justMoved ? 'Wait' : 'Cancel'}
                       </button>
                     </div>
                   </div>

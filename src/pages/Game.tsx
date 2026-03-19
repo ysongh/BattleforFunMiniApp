@@ -1134,7 +1134,7 @@ const Game = () => {
                 {/* Factory dropdown anchored to tile */}
                 {factoryMenu && factoryMenu.x === absoluteX && factoryMenu.y === absoluteY && (
                   <div
-                    className="absolute top-full left-1/2 -translate-x-1/2 pt-0 z-50"
+                    className={`absolute left-1/2 -translate-x-1/2 z-50 ${relY >= viewSize / 2 ? 'bottom-full pb-1' : 'top-full pt-1'}`}
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
@@ -1167,7 +1167,7 @@ const Game = () => {
                 {/* Action dropdown anchored to tile */}
                 {actionMenu && actionMenu.x === absoluteX && actionMenu.y === absoluteY && (
                   <div
-                    className="absolute top-full left-1/2 -translate-x-1/2 pt-0 z-50"
+                    className={`absolute left-1/2 -translate-x-1/2 z-50 ${relY >= viewSize / 2 ? 'bottom-full pb-1' : 'top-full pt-1'}`}
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
                   >

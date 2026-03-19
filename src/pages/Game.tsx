@@ -14,6 +14,7 @@ import {
   IconRobot,
   IconClock,
   IconBolt,
+  IconBuildingFactory,
 } from '@tabler/icons-react';
 
 // Game constants
@@ -22,6 +23,12 @@ const COOLDOWN_DURATION = 10000; // 10 seconds
 const AP_REGEN_INTERVAL = 20000; // 1 AP every 20 seconds
 const AI_ACTION_INTERVAL = 3000; // AI tries to act every 3 seconds
 const MAX_AP = 10;
+
+const UNIT_COSTS: Record<UnitType, number> = {
+  Infantry: 100,
+  Tank: 300,
+  Artillery: 250,
+};
 
 const UNIT_TYPES: Record<UnitType, Omit<Unit, 'id' | 'position' | 'player'>> = {
   Infantry: {
@@ -187,6 +194,9 @@ const Game = () => {
     canCapture: boolean;
     enemies: { unit: Unit; x: number; y: number }[];
   } | null>(null);
+
+  // Factory menu state: shown when clicking an owned city with no unit
+  const [factoryMenu, setFactoryMenu] = useState<{ x: number; y: number } | null>(null);
 
   // AI state
   const [isAIEnabled, setIsAIEnabled] = useState(lobbyState?.isAIEnabled ?? false);
@@ -590,8 +600,20 @@ const Game = () => {
 
   const handleTileClick = (x: number, y: number) => {
     if (actionMenu) return; // Block interaction while capture menu is open
+    if (factoryMenu) { setFactoryMenu(null); return; } // Close factory menu on outside click
 
     if (!selectedUnit) {
+      // Check if clicking an owned empty city → open factory
+      const tile = grid[y]?.[x];
+      if (tile && tile.terrain.isCity && !tile.unit) {
+        const city = tile.terrain as City;
+        if (city.owner === 'Red') {
+          setFactoryMenu({ x, y });
+          setGameStatus('Select a unit to produce');
+          return;
+        }
+      }
+
       if (grid[y][x].unit?.player === 'Red') {
         handleUnitSelect(x, y);
       }
@@ -723,6 +745,35 @@ const Game = () => {
     setActionPoints(prev => ({ ...prev, Red: prev.Red - 1 }));
     setUnitCooldowns(prev => ({ ...prev, [unit.id]: Date.now() + COOLDOWN_DURATION }));
     setActionMenu(null);
+  };
+
+  // --- Factory: buy units on owned cities ---
+
+  const handleBuyUnit = (unitType: UnitType) => {
+    if (!factoryMenu) return;
+    const { x, y } = factoryMenu;
+    const cost = UNIT_COSTS[unitType];
+
+    if (resources.Red < cost) {
+      setGameStatus(`Not enough funds! Need $${cost}`);
+      return;
+    }
+
+    if (actionPoints.Red <= 0) {
+      setGameStatus('No AP to produce unit!');
+      return;
+    }
+
+    const updatedGrid = [...grid];
+    const newUnit = createUnit(unitType, [x, y], 'Red');
+    updatedGrid[y][x].unit = newUnit;
+
+    setGrid(updatedGrid);
+    setResources(prev => ({ ...prev, Red: prev.Red - cost }));
+    setActionPoints(prev => ({ ...prev, Red: prev.Red - 1 }));
+    setUnitCooldowns(prev => ({ ...prev, [newUnit.id]: Date.now() + COOLDOWN_DURATION }));
+    setFactoryMenu(null);
+    setGameStatus(`Produced ${unitType} for $${cost}`);
   };
 
   const handleWait = () => {
@@ -1077,6 +1128,39 @@ const Game = () => {
                         />
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Factory dropdown anchored to tile */}
+                {factoryMenu && factoryMenu.x === absoluteX && factoryMenu.y === absoluteY && (
+                  <div
+                    className="absolute top-full left-1/2 -translate-x-1/2 pt-0 z-50"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="bg-white rounded shadow-lg border border-gray-300 p-2 w-48 space-y-1">
+                      <p className="text-xs font-semibold flex items-center gap-1">
+                        <IconBuildingFactory size={12} /> Factory — Buy Unit
+                      </p>
+                      {(['Infantry', 'Tank', 'Artillery'] as UnitType[]).map(unitType => (
+                        <button
+                          key={unitType}
+                          className="w-full bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs font-semibold disabled:opacity-50 flex items-center justify-between"
+                          onClick={() => handleBuyUnit(unitType)}
+                          disabled={resources.Red < UNIT_COSTS[unitType] || actionPoints.Red <= 0}
+                        >
+                          <span className="flex items-center gap-1">{getUnitIcon(unitType)} {unitType}</span>
+                          <span>${UNIT_COSTS[unitType]}</span>
+                        </button>
+                      ))}
+                      <p className="text-xs text-gray-500 text-center">Funds: ${resources.Red}</p>
+                      <button
+                        className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded text-xs font-semibold"
+                        onClick={() => setFactoryMenu(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
 

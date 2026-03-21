@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import type { UnitType, TerrainType, Player, City, Terrain, Unit, Tile } from '../types/game';
 import {
@@ -197,6 +198,26 @@ const Game = () => {
 
   // Factory menu state: shown when clicking an owned city with no unit
   const [factoryMenu, setFactoryMenu] = useState<{ x: number; y: number } | null>(null);
+
+  // Ref map for tile DOM elements (used to position portal menus)
+  const tileRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const setTileRef = useCallback((key: string, el: HTMLDivElement | null) => {
+    if (el) tileRefs.current.set(key, el);
+    else tileRefs.current.delete(key);
+  }, []);
+
+  const getMenuPosition = (x: number, y: number) => {
+    const el = tileRefs.current.get(`${x},${y}`);
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openAbove = spaceBelow < 200;
+    return {
+      left: rect.left + rect.width / 2,
+      top: openAbove ? rect.top : rect.bottom,
+      openAbove,
+    };
+  };
 
   // AI state
   const [isAIEnabled, setIsAIEnabled] = useState(lobbyState?.isAIEnabled ?? false);
@@ -1078,6 +1099,7 @@ const Game = () => {
             return (
               <div
                 key={`${absoluteX}-${absoluteY}`}
+                ref={(el) => setTileRef(`${absoluteX},${absoluteY}`, el)}
                 className={`
                   w-10 h-10 relative
                   ${getTerrainColor(tile.terrain.type)}
@@ -1142,84 +1164,6 @@ const Game = () => {
                   </div>
                 )}
 
-                {/* Factory dropdown anchored to tile */}
-                {factoryMenu && factoryMenu.x === absoluteX && factoryMenu.y === absoluteY && (
-                  <div
-                    className={`absolute left-1/2 -translate-x-1/2 z-50 ${relY >= viewSize / 2 ? 'bottom-full pb-1' : 'top-full pt-1'}`}
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    <div className="bg-white rounded shadow-lg border border-gray-300 p-2 w-48 space-y-1">
-                      <p className="text-xs font-semibold flex items-center gap-1">
-                        <IconBuildingFactory size={12} /> Factory — Buy Unit
-                      </p>
-                      {(['Infantry', 'Tank', 'Artillery'] as UnitType[]).map(unitType => (
-                        <button
-                          key={unitType}
-                          className="w-full bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs font-semibold disabled:opacity-50 flex items-center justify-between"
-                          onClick={() => handleBuyUnit(unitType)}
-                          disabled={resources.Red < UNIT_COSTS[unitType] || actionPoints.Red <= 0}
-                        >
-                          <span className="flex items-center gap-1">{getUnitIcon(unitType)} {unitType}</span>
-                          <span>${UNIT_COSTS[unitType]}</span>
-                        </button>
-                      ))}
-                      <p className="text-xs text-gray-500 text-center">Funds: ${resources.Red}</p>
-                      <button
-                        className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded text-xs font-semibold"
-                        onClick={() => setFactoryMenu(null)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Action dropdown anchored to tile */}
-                {actionMenu && actionMenu.x === absoluteX && actionMenu.y === absoluteY && (
-                  <div
-                    className={`absolute left-1/2 -translate-x-1/2 z-50 ${relY >= viewSize / 2 ? 'bottom-full pb-1' : 'top-full pt-1'}`}
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    <div className="bg-white rounded shadow-lg border border-gray-300 p-2 w-44 space-y-1">
-                      {/* Capture option */}
-                      {actionMenu.canCapture && (
-                        <>
-                          <p className="text-xs text-gray-600 whitespace-nowrap">
-                            Capture: {(grid[actionMenu.y]?.[actionMenu.x]?.terrain as City)?.captureProgress ?? 0}/20 (+{Math.floor(actionMenu.unit.health / 10)})
-                          </p>
-                          <button
-                            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-semibold disabled:opacity-50"
-                            onClick={handleCapture}
-                            disabled={actionPoints.Red <= 0}
-                          >
-                            Capture {actionMenu.justMoved ? '' : '(1 AP)'}
-                          </button>
-                        </>
-                      )}
-                      {/* Attack options */}
-                      {actionMenu.enemies.map((enemy) => (
-                        <button
-                          key={enemy.unit.id}
-                          className="w-full bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-semibold disabled:opacity-50 flex items-center justify-between"
-                          onClick={() => handleAttackFromMenu(enemy.x, enemy.y)}
-                          disabled={actionPoints.Red <= 0 && !actionMenu.justMoved}
-                        >
-                          <span>Attack {enemy.unit.type}</span>
-                          <span className="text-red-200">{enemy.unit.health}hp</span>
-                        </button>
-                      ))}
-                      {/* Wait / Cancel */}
-                      <button
-                        className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded text-xs font-semibold"
-                        onClick={handleWait}
-                      >
-                        {actionMenu.justMoved ? 'Wait' : 'Cancel'}
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 <div className="absolute top-0 left-0 text-xs text-gray-700 opacity-50">
                   {absoluteX},{absoluteY}
@@ -1230,7 +1174,101 @@ const Game = () => {
         )}
       </div>
 
-      {/* Capture Menu - inline dropdown anchored to the tile */}
+      {/* Factory menu — rendered via portal to escape grid overflow */}
+      {factoryMenu && (() => {
+        const pos = getMenuPosition(factoryMenu.x, factoryMenu.y);
+        if (!pos) return null;
+        return createPortal(
+          <div
+            className="fixed z-[9999]"
+            style={{
+              left: pos.left,
+              top: pos.openAbove ? pos.top : pos.top,
+              transform: pos.openAbove ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className={`bg-white rounded shadow-lg border border-gray-300 p-2 w-48 space-y-1 ${pos.openAbove ? 'mb-1' : 'mt-1'}`}>
+              <p className="text-xs font-semibold flex items-center gap-1">
+                <IconBuildingFactory size={12} /> Factory — Buy Unit
+              </p>
+              {(['Infantry', 'Tank', 'Artillery'] as UnitType[]).map(unitType => (
+                <button
+                  key={unitType}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs font-semibold disabled:opacity-50 flex items-center justify-between"
+                  onClick={() => handleBuyUnit(unitType)}
+                  disabled={resources.Red < UNIT_COSTS[unitType] || actionPoints.Red <= 0}
+                >
+                  <span className="flex items-center gap-1">{getUnitIcon(unitType)} {unitType}</span>
+                  <span>${UNIT_COSTS[unitType]}</span>
+                </button>
+              ))}
+              <p className="text-xs text-gray-500 text-center">Funds: ${resources.Red}</p>
+              <button
+                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded text-xs font-semibold"
+                onClick={() => setFactoryMenu(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
+
+      {/* Action menu — rendered via portal to escape grid overflow */}
+      {actionMenu && (() => {
+        const pos = getMenuPosition(actionMenu.x, actionMenu.y);
+        if (!pos) return null;
+        return createPortal(
+          <div
+            className="fixed z-[9999]"
+            style={{
+              left: pos.left,
+              top: pos.openAbove ? pos.top : pos.top,
+              transform: pos.openAbove ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className={`bg-white rounded shadow-lg border border-gray-300 p-2 w-44 space-y-1 ${pos.openAbove ? 'mb-1' : 'mt-1'}`}>
+              {actionMenu.canCapture && (
+                <>
+                  <p className="text-xs text-gray-600 whitespace-nowrap">
+                    Capture: {(grid[actionMenu.y]?.[actionMenu.x]?.terrain as City)?.captureProgress ?? 0}/20 (+{Math.floor(actionMenu.unit.health / 10)})
+                  </p>
+                  <button
+                    className="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-semibold disabled:opacity-50"
+                    onClick={handleCapture}
+                    disabled={actionPoints.Red <= 0}
+                  >
+                    Capture {actionMenu.justMoved ? '' : '(1 AP)'}
+                  </button>
+                </>
+              )}
+              {actionMenu.enemies.map((enemy) => (
+                <button
+                  key={enemy.unit.id}
+                  className="w-full bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-semibold disabled:opacity-50 flex items-center justify-between"
+                  onClick={() => handleAttackFromMenu(enemy.x, enemy.y)}
+                  disabled={actionPoints.Red <= 0 && !actionMenu.justMoved}
+                >
+                  <span>Attack {enemy.unit.type}</span>
+                  <span className="text-red-200">{enemy.unit.health}hp</span>
+                </button>
+              ))}
+              <button
+                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded text-xs font-semibold"
+                onClick={handleWait}
+              >
+                {actionMenu.justMoved ? 'Wait' : 'Cancel'}
+              </button>
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
 
       {/* How to Play */}
       <div className="mt-2 bg-white p-2 rounded shadow w-full max-w-md">

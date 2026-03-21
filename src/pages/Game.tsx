@@ -1120,6 +1120,17 @@ const Game = () => {
 
                 {tile.terrain.isCity && (
                   <div className={`absolute inset-0 border-4 ${getCityOwnerColor(tile.terrain as City)}`}>
+                    {/* Factory icon on owned empty cities */}
+                    {!tileUnit && (tile.terrain as City).owner === 'Red' && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <IconBuildingFactory size={28} className="text-red-600 opacity-70" />
+                      </div>
+                    )}
+                    {!tileUnit && (tile.terrain as City).owner === 'Blue' && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <IconBuildingFactory size={28} className="text-blue-600 opacity-70" />
+                      </div>
+                    )}
                     {(tile.terrain as City).captureProgress > 0 && (
                       <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-600">
                         <div

@@ -1,8 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import type { UnitType, TerrainType, Player, City, Terrain, Unit, Tile } from '../types/game';
+import type { UnitType, Player, City, Unit, Tile } from '../types/game';
 import { computeAIAction } from '../lib/ai';
+import { calculateDamage, countPlayerUnits } from '../lib/combat';
+import { GRID_SIZE, COOLDOWN_DURATION, AP_REGEN_INTERVAL, AI_ACTION_INTERVAL, MAX_AP, UNIT_COSTS } from '../lib/constants';
+import { getTerrainColor, getUnitColor, getCityOwnerColor, generateInitialGrid, calculateMovementRange as calcMovementRange, calculateAttackRange as calcAttackRange, findEnemiesInRange as findEnemies } from '../lib/grid';
+import { createUnit } from '../lib/units';
 import {
   IconSword,
   IconShield,
@@ -19,84 +23,7 @@ import {
   IconBuildingFactory,
 } from '@tabler/icons-react';
 
-// Game constants
-const GRID_SIZE = 10;
-const COOLDOWN_DURATION = 10000; // 10 seconds
-const AP_REGEN_INTERVAL = 20000; // 1 AP every 20 seconds
-const AI_ACTION_INTERVAL = 3000; // AI tries to act every 3 seconds
-const MAX_AP = 10;
-
-const UNIT_COSTS: Record<UnitType, number> = {
-  Infantry: 100,
-  Tank: 300,
-  Artillery: 250,
-};
-
-const UNIT_TYPES: Record<UnitType, Omit<Unit, 'id' | 'position' | 'player'>> = {
-  Infantry: {
-    type: 'Infantry',
-    health: 100,
-    attack: 55,
-    defense: 10,
-    moveRange: 3,
-    attackRange: 1,
-  },
-  Tank: {
-    type: 'Tank',
-    health: 100,
-    attack: 75,
-    defense: 30,
-    moveRange: 5,
-    attackRange: 1,
-  },
-  Artillery: {
-    type: 'Artillery',
-    health: 100,
-    attack: 90,
-    defense: 5,
-    moveRange: 3,
-    attackRange: 3,
-  },
-};
-
-const TERRAIN_TYPES: Record<TerrainType, Terrain> = {
-  Plain: { type: 'Plain', defenseBonus: 0, movementCost: 1 },
-  Mountain: { type: 'Mountain', defenseBonus: 30, movementCost: 3 },
-  Forest: { type: 'Forest', defenseBonus: 10, movementCost: 2 },
-  City: {
-    type: 'City',
-    defenseBonus: 20,
-    movementCost: 1,
-    isCity: true,
-  },
-  Road: { type: 'Road', defenseBonus: 0, movementCost: 0.5 },
-};
-
-// Helper functions
-const generateId = () => Math.random().toString(36).substring(2, 9);
-
-const createUnit = (type: UnitType, position: [number, number], player: Player): Unit => ({
-  id: generateId(),
-  position,
-  player,
-  ...UNIT_TYPES[type],
-});
-
-const getTerrainColor = (terrain: TerrainType): string => {
-  switch (terrain) {
-    case 'Plain': return 'bg-green-200';
-    case 'Mountain': return 'bg-gray-500';
-    case 'Forest': return 'bg-green-600';
-    case 'City': return 'bg-yellow-200';
-    case 'Road': return 'bg-yellow-600';
-    default: return 'bg-green-200';
-  }
-};
-
-const getUnitColor = (player: Player): string => {
-  return player === 'Red' ? 'bg-red-500' : 'bg-blue-500';
-};
-
+// UI helper (returns JSX, so stays in component file)
 const getUnitIcon = (type: UnitType) => {
   switch (type) {
     case 'Infantry': return <IconSword size={16} stroke={2.5} color="white" />;
@@ -105,70 +32,6 @@ const getUnitIcon = (type: UnitType) => {
   }
 };
 
-const generateInitialGrid = (): Tile[][] => {
-  const grid: Tile[][] = [];
-  const terrainTypes = Object.keys(TERRAIN_TYPES) as TerrainType[];
-
-  for (let y = 0; y < GRID_SIZE; y++) {
-    grid[y] = [];
-    for (let x = 0; x < GRID_SIZE; x++) {
-      const randomTerrainIndex = Math.floor(Math.random() * terrainTypes.length);
-      grid[y][x] = {
-        position: [x, y],
-        terrain: TERRAIN_TYPES[terrainTypes[randomTerrainIndex]],
-        unit: null,
-      };
-    }
-  }
-
-  for (let i = 0; i < 30; i++) {
-    const x = Math.floor(Math.random() * GRID_SIZE);
-    const y = Math.floor(Math.random() * GRID_SIZE);
-    grid[y][x].terrain = TERRAIN_TYPES.Mountain;
-  }
-
-  for (let i = 0; i < 40; i++) {
-    const x = Math.floor(Math.random() * GRID_SIZE);
-    const y = Math.floor(Math.random() * GRID_SIZE);
-    grid[y][x].terrain = TERRAIN_TYPES.Forest;
-  }
-
-  for (let i = 0; i < 15; i++) {
-    const x = Math.floor(Math.random() * GRID_SIZE);
-    const y = Math.floor(Math.random() * GRID_SIZE);
-    grid[y][x].terrain = TERRAIN_TYPES.City;
-  }
-
-  for (let i = 0; i < 3; i++) {
-    const startX = Math.floor(Math.random() * GRID_SIZE);
-    let x = startX;
-    for (let y = 0; y < GRID_SIZE; y++) {
-      grid[y][x].terrain = TERRAIN_TYPES.Road;
-      if (Math.random() > 0.7 && x > 0 && x < GRID_SIZE - 1) {
-        x += Math.random() > 0.5 ? 1 : -1;
-      }
-    }
-  }
-
-  for (let i = 0; i < 3; i++) {
-    const startY = Math.floor(Math.random() * GRID_SIZE);
-    let y = startY;
-    for (let x = 0; x < GRID_SIZE; x++) {
-      grid[y][x].terrain = TERRAIN_TYPES.Road;
-      if (Math.random() > 0.7 && y > 0 && y < GRID_SIZE - 1) {
-        y += Math.random() > 0.5 ? 1 : -1;
-      }
-    }
-  }
-
-  return grid;
-};
-
-const calculateDamage = (attacker: Unit, defender: Unit, defenderTerrain: Terrain): number => {
-  const terrainDefense = defender.defense * (defenderTerrain.defenseBonus / 100);
-  const damage = Math.max(0, attacker.attack - (defender.defense + terrainDefense));
-  return Math.min(defender.health, Math.max(10, damage));
-};
 
 const Game = () => {
   const location = useLocation();
@@ -277,11 +140,7 @@ const Game = () => {
     if (action.type === 'attack') {
       setGameStatus(`AI ${action.unit.type} attacked!`);
       // Check win
-      let redCount = 0;
-      for (let y = 0; y < GRID_SIZE; y++)
-        for (let x = 0; x < GRID_SIZE; x++)
-          if (action.newGrid[y]?.[x]?.unit?.player === 'Red') redCount++;
-      if (redCount === 0) {
+      if (countPlayerUnits(action.newGrid, 'Red') === 0) {
         setGameStatus('Blue wins!');
         gameOverRef.current = true;
       }
@@ -362,89 +221,6 @@ const Game = () => {
 
   // --- Movement range (Dijkstra) ---
 
-  const calculateMovementRange = (unit: Unit): [number, number][] => {
-    const [startX, startY] = unit.position;
-    const budget = unit.moveRange;
-
-    const costMap = new Map<string, number>();
-    const queue: { x: number; y: number; cost: number }[] = [];
-    const validMovesSet = new Set<string>();
-
-    costMap.set(`${startX},${startY}`, 0);
-    queue.push({ x: startX, y: startY, cost: 0 });
-
-    while (queue.length > 0) {
-      queue.sort((a, b) => a.cost - b.cost);
-      const { x, y, cost } = queue.shift()!;
-
-      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-        const nx = x + dx, ny = y + dy;
-        if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
-
-        const tile = grid[ny][nx];
-        const newCost = cost + tile.terrain.movementCost;
-        if (newCost > budget) continue;
-
-        const key = `${nx},${ny}`;
-        const best = costMap.get(key);
-        if (best !== undefined && best <= newCost) continue;
-        costMap.set(key, newCost);
-
-        const occupant = tile.unit;
-        if (occupant === null) {
-          validMovesSet.add(key);
-          queue.push({ x: nx, y: ny, cost: newCost });
-        } else if (occupant.player === unit.player) {
-          queue.push({ x: nx, y: ny, cost: newCost });
-        }
-      }
-    }
-
-    return [...validMovesSet].map(key => {
-      const [kx, ky] = key.split(',').map(Number);
-      return [kx, ky] as [number, number];
-    });
-  };
-
-  const calculateAttackRange = (unit: Unit): [number, number][] => {
-    const [x, y] = unit.position;
-    const range = unit.attackRange;
-    const validAttacks: [number, number][] = [];
-
-    for (let dx = -range; dx <= range; dx++) {
-      for (let dy = -range; dy <= range; dy++) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
-        if (grid[ny][nx].unit === null || grid[ny][nx].unit?.player === unit.player) continue;
-        const distance = Math.abs(dx) + Math.abs(dy);
-        if (distance <= range) {
-          validAttacks.push([nx, ny]);
-        }
-      }
-    }
-
-    return validAttacks;
-  };
-
-  // Find enemy units within attack range from a given position
-  const findEnemiesInRange = (unit: Unit, ux: number, uy: number): { unit: Unit; x: number; y: number }[] => {
-    const enemies: { unit: Unit; x: number; y: number }[] = [];
-    if (unit.attackRange <= 0) return enemies;
-    for (let dy = -unit.attackRange; dy <= unit.attackRange; dy++) {
-      for (let dx = -unit.attackRange; dx <= unit.attackRange; dx++) {
-        const nx = ux + dx, ny = uy + dy;
-        if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
-        if (Math.abs(dx) + Math.abs(dy) > unit.attackRange) continue;
-        const target = grid[ny]?.[nx]?.unit;
-        if (target && target.player !== unit.player) {
-          enemies.push({ unit: target, x: nx, y: ny });
-        }
-      }
-    }
-    return enemies;
-  };
-
   // --- Selection & interaction ---
 
   const handleUnitSelect = (x: number, y: number) => {
@@ -479,7 +255,7 @@ const Game = () => {
     const tile = grid[y][x];
     const canCapture = unit.type === 'Infantry' && !!tile.terrain.isCity &&
       (!((tile.terrain as City).owner) || (tile.terrain as City).owner !== unit.player);
-    const nearbyEnemies = findEnemiesInRange(unit, x, y);
+    const nearbyEnemies = findEnemies(unit, x, y, grid);
 
     if (canCapture || nearbyEnemies.length > 0) {
       setActionMenu({ unit, x, y, justMoved: false, canCapture, enemies: nearbyEnemies });
@@ -487,10 +263,10 @@ const Game = () => {
       return;
     }
 
-    const moveRange = calculateMovementRange(unit);
+    const moveRange = calcMovementRange(unit, grid);
     setMovementRange(moveRange);
 
-    const atkRange = calculateAttackRange(unit);
+    const atkRange = calcAttackRange(unit, grid);
     setAttackRange(atkRange);
 
     if (moveRange.length > 0 || atkRange.length > 0) {
@@ -689,8 +465,8 @@ const Game = () => {
       setGameStatus(`${unit.type} is waiting`);
     } else {
       // Unit was already here — show move/attack options instead
-      const moveRange = calculateMovementRange(unit);
-      const atkRange = calculateAttackRange(unit);
+      const moveRange = calcMovementRange(unit, grid);
+      const atkRange = calcAttackRange(unit, grid);
       setSelectedUnit(unit);
       setMovementRange(moveRange);
       setAttackRange(atkRange);
@@ -730,11 +506,7 @@ const Game = () => {
     setActionMenu(null);
 
     // Check win condition
-    let blueCount = 0;
-    for (let cy = 0; cy < GRID_SIZE; cy++)
-      for (let cx = 0; cx < GRID_SIZE; cx++)
-        if (updatedGrid[cy]?.[cx]?.unit?.player === 'Blue') blueCount++;
-    if (blueCount === 0) {
+    if (countPlayerUnits(updatedGrid, 'Blue') === 0) {
       setGameStatus('Red wins!');
       gameOverRef.current = true;
     }
@@ -770,23 +542,13 @@ const Game = () => {
     setAttackRange([]);
 
     // Check win condition
-    let blueCount = 0;
-    for (let cy = 0; cy < GRID_SIZE; cy++)
-      for (let cx = 0; cx < GRID_SIZE; cx++)
-        if (updatedGrid[cy]?.[cx]?.unit?.player === 'Blue') blueCount++;
-
-    if (blueCount === 0) {
+    if (countPlayerUnits(updatedGrid, 'Blue') === 0) {
       setGameStatus('Red wins!');
       gameOverRef.current = true;
     }
   };
 
   // --- Viewport & navigation ---
-
-  const getCityOwnerColor = (city: City): string => {
-    if (!city.owner) return 'border-gray-600';
-    return city.owner === 'Red' ? 'border-red-600' : 'border-blue-600';
-  };
 
   const isInMovementRange = (x: number, y: number): boolean =>
     movementRange.some(([mx, my]) => mx === x && my === y);

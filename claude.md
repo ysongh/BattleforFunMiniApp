@@ -99,20 +99,17 @@ typescript   damage = max(5, attacker.attack - floor(defender.defense / 2))
 
 ### Architecture
 
-The AI system is composed of several key functions that work together to make strategic decisions:
+The AI logic lives in `src/lib/ai.ts` and exposes a single pure function `computeAIAction()` that returns an action (attack or move) without touching React state. The Game component calls it on an interval and applies the returned action to state.
+
 ```
-playAITurn()
-├── selectUnitToMove()
-│   ├── Filter available units
-│   └── Apply difficulty-based selection
-├── executeAIMove()
-│   ├── calculateBestMovePosition()
-│   │   ├── findAttackTargets()
-│   │   └── calculateDistance()
-│   └── Move unit to optimal position
-└── executeAIAttack()
-    ├── Find weakest target
-    └── Execute attack
+Game.tsx: tryAIAction() (useCallback)
+└── ai.ts: computeAIAction(context)
+    ├── Find available Blue units (not on cooldown)
+    ├── Find all Red units
+    ├── Pick unit (difficulty-based selection)
+    ├── Try attack first (difficulty-based targeting)
+    └── Fall back to move toward nearest enemy
+    └── Returns { type, unit, newGrid } or null
 ```
 
 ### AI Functions
@@ -211,9 +208,15 @@ Players can change AI difficulty at any time using the in-game controls. The dif
 ```
 src/
 ├── pages/
-│   └── Game.tsx              # Main game component with AI
-├── data/
-│   └── units.ts              # Unit definitions and stats
+│   └── Game.tsx              # Main game component (UI, state, event handlers)
+├── lib/
+│   ├── ai.ts                # AI decision logic (computeAIAction)
+│   ├── combat.ts            # Damage calculation, win condition checks
+│   ├── constants.ts         # Game constants, unit stats, terrain definitions
+│   ├── grid.ts              # Grid generation, movement/attack range, terrain helpers
+│   └── units.ts             # Unit factory (createUnit, generateId)
+├── types/
+│   └── game.ts              # Type definitions (Unit, Tile, Terrain, etc.)
 ├── components/
 │   └── [UI components]       # Game UI components
 └── styles/

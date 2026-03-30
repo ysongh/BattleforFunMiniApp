@@ -413,7 +413,8 @@ const Game = () => {
     if (city.captureProgress >= 20) {
       city.owner = unit.player;
       city.captureProgress = 0;
-      setGameStatus(`${unit.player} captured a city!`);
+      setResources(prev => ({ ...prev, [unit.player]: prev[unit.player] + 1000 }));
+      setGameStatus(`${unit.player} captured a city! +$1000`);
     } else {
       setGameStatus(`Capturing: ${city.captureProgress}/20`);
     }

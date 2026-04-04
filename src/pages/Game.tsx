@@ -495,7 +495,26 @@ const Game = () => {
       setGameStatus(`${defender.type} destroyed!`);
     } else {
       updatedGrid[enemyY][enemyX].unit = updatedDefender;
-      setGameStatus(`${defender.type} took ${damage} damage!`);
+
+      // Counter-attack: close-range enemy strikes back based on its remaining health
+      const [ax, ay] = unit.position;
+      const distance = Math.abs(enemyX - ax) + Math.abs(enemyY - ay);
+      if (updatedDefender.attackRange === 1 && distance <= 1) {
+        const attackerTerrain = updatedGrid[ay][ax].terrain;
+        const counterDamage = Math.max(1, Math.round(
+          calculateDamage(updatedDefender, unit, attackerTerrain) * (updatedDefender.health / 100)
+        ));
+        const updatedAttacker = { ...unit, health: unit.health - counterDamage };
+        if (updatedAttacker.health <= 0) {
+          updatedGrid[ay][ax].unit = null;
+          setGameStatus(`${defender.type} took ${damage} dmg and counter-attacked, destroying ${unit.type}!`);
+        } else {
+          updatedGrid[ay][ax].unit = updatedAttacker;
+          setGameStatus(`${defender.type} took ${damage} dmg and counter-attacked for ${counterDamage}!`);
+        }
+      } else {
+        setGameStatus(`${defender.type} took ${damage} damage!`);
+      }
     }
 
     setGrid(updatedGrid);
@@ -506,9 +525,13 @@ const Game = () => {
     setUnitCooldowns(prev => ({ ...prev, [unit.id]: Date.now() + COOLDOWN_DURATION }));
     setActionMenu(null);
 
-    // Check win condition
+    // Check win conditions
     if (countPlayerUnits(updatedGrid, 'Blue') === 0) {
       setGameStatus('Red wins!');
+      gameOverRef.current = true;
+    }
+    if (countPlayerUnits(updatedGrid, 'Red') === 0) {
+      setGameStatus('Blue wins!');
       gameOverRef.current = true;
     }
   };
@@ -532,7 +555,26 @@ const Game = () => {
       setGameStatus(`${defender.type} destroyed!`);
     } else {
       updatedGrid[y][x].unit = updatedDefender;
-      setGameStatus(`${defender.type} took ${damage} damage!`);
+
+      // Counter-attack: close-range enemy strikes back based on its remaining health
+      const [ax, ay] = attacker.position;
+      const distance = Math.abs(x - ax) + Math.abs(y - ay);
+      if (updatedDefender.attackRange === 1 && distance <= 1) {
+        const attackerTerrain = grid[ay][ax].terrain;
+        const counterDamage = Math.max(1, Math.round(
+          calculateDamage(updatedDefender, attacker, attackerTerrain) * (updatedDefender.health / 100)
+        ));
+        const updatedAttacker = { ...attacker, health: attacker.health - counterDamage };
+        if (updatedAttacker.health <= 0) {
+          updatedGrid[ay][ax].unit = null;
+          setGameStatus(`${defender.type} took ${damage} dmg and counter-attacked, destroying ${attacker.type}!`);
+        } else {
+          updatedGrid[ay][ax].unit = updatedAttacker;
+          setGameStatus(`${defender.type} took ${damage} dmg and counter-attacked for ${counterDamage}!`);
+        }
+      } else {
+        setGameStatus(`${defender.type} took ${damage} damage!`);
+      }
     }
 
     setGrid(updatedGrid);
@@ -542,9 +584,13 @@ const Game = () => {
     setMovementRange([]);
     setAttackRange([]);
 
-    // Check win condition
+    // Check win conditions
     if (countPlayerUnits(updatedGrid, 'Blue') === 0) {
       setGameStatus('Red wins!');
+      gameOverRef.current = true;
+    }
+    if (countPlayerUnits(updatedGrid, 'Red') === 0) {
+      setGameStatus('Blue wins!');
       gameOverRef.current = true;
     }
   };

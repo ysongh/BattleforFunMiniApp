@@ -23,6 +23,8 @@ Multiple Unit Types: Infantry, Tanks, Artillery, and APCs with unique stats
 Health System: Units have HP, attack, and defense values
 Movement and Attack Ranges: Each unit type has specific movement and attack capabilities
 Visual Feedback: Health bars, unit selection highlighting, and possible move indicators
+City Capture & Funds: Infantry can capture neutral/enemy cities; capturing awards $1000 to the player
+Counter-Attack System: Close-range enemies (Infantry, Tank) retaliate when attacked; counter-damage scales with the defender's remaining health
 
 AI Features
 
@@ -78,22 +80,37 @@ Combat System
 
 Damage Calculation:
 
-typescript   damage = max(5, attacker.attack - floor(defender.defense / 2))
+```typescript
+damage = max(0, attacker.attack - (defender.defense + terrain_defense_bonus))
+// clamped to: max(10, damage), capped at defender.health
 ```
 
-2. **Attack Range**: Attacks follow the same Manhattan distance calculation as movement
+2. **Counter-Attack**: When a close-range enemy (`attackRange === 1`) survives a hit and the attacker is adjacent (distance ≤ 1), it immediately retaliates:
 
-3. **Turn Sequence**:
+```typescript
+counterDamage = max(1, round(calculateDamage(defender, attacker, attackerTerrain) * (defender.health / 100)))
+```
+Artillery (`attackRange === 3`) never counter-attacks.
+
+3. **Attack Range**: Attacks follow the same Manhattan distance calculation as movement
+
+4. **Turn Sequence**:
    - Move unit (optional)
-   - Attack enemy (optional)
+   - Attack enemy (optional, triggers counter-attack if close range)
    - End turn
 
-4. **Unit Elimination**: Units with 0 HP are removed from the battlefield
+5. **Unit Elimination**: Units with 0 HP are removed from the battlefield
+
+### Economy System
+
+- **Starting Funds**: Each player begins with $1000
+- **City Capture**: Sending an Infantry unit onto a City tile and using the Capture action awards **$1000** upon full capture (progress reaches 20)
+- **Spending Funds**: Funds are spent to produce new units from owned city factories (`handleBuyUnit` in `Game.tsx`)
 
 ### Win Conditions
 
 - **Victory**: Eliminate all enemy units
-- **Defeat**: Lose all your units
+- **Defeat**: Lose all your units (including via counter-attack)
 
 ## AI Implementation
 
@@ -271,8 +288,10 @@ Strategy Tips
 Positioning: Use your units' movement range to control the battlefield
 Focus Fire: Concentrate attacks on single enemies to eliminate them
 Defense: Higher defense units should lead the assault
-Range: Use Artillery's longer attack range to your advantage
+Range: Use Artillery's longer attack range to your advantage — Artillery never triggers counter-attacks
 HP Management: Retreat wounded units and bring fresh ones forward
+City Control: Capture cities with Infantry to earn $1000 and fund new unit production
+Counter-Attack Awareness: Attacking a healthy close-range enemy will hurt back — weaken them with Artillery first
 
 API Reference
 Component Props
@@ -302,9 +321,9 @@ Cancels the attack confirmation modal.
 Future Enhancements
 Gameplay Features
 
-Terrain System: Add different terrain types with movement costs and defense bonuses
-Unit Production: Allow players to build new units from bases
-Resource Management: Add economy system for unit production
+Terrain System: ✅ Implemented (Plain, Mountain, Forest, City, Road with movement costs and defense bonuses)
+Unit Production: ✅ Implemented (buy units from owned city factories using funds)
+Resource Management: ✅ Implemented (earn $1000 per city captured; spend funds on unit production)
 Fog of War: Hide enemy units outside vision range
 Special Abilities: Add unique abilities for each unit type
 Multiple Maps: Create different battlefield layouts
@@ -358,6 +377,6 @@ GitHub Issues: https://github.com/ysongh/BattleforFunMiniApp/issues
 Email: [Contact Email]
 
 
-Version: 1.0.0 (with AI implementation)
-Last Updated: March 2026
+Version: 1.2.0
+Last Updated: April 2026
 </artifact>

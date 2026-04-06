@@ -133,12 +133,43 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isUnitOnCooldown, cool
       {unit && (
         <group position={[0, h, 0]}>
           {unit.type === 'Infantry' && (
-            <mesh position={[0, 0.22, 0]} castShadow>
-              <cylinderGeometry args={[0.17, 0.17, 0.44, 12]} />
-              <meshLambertMaterial
-                color={isUnitOnCooldown ? UNIT_DIM_COLOR[unit.player] : UNIT_BASE_COLOR[unit.player]}
-              />
-            </mesh>
+            <group>
+              {/* Left leg */}
+              <mesh position={[-0.065, 0.09, 0]} castShadow>
+                <cylinderGeometry args={[0.045, 0.045, 0.18, 6]} />
+                <meshLambertMaterial color={isUnitOnCooldown ? UNIT_DIM_COLOR[unit.player] : UNIT_BASE_COLOR[unit.player]} />
+              </mesh>
+              {/* Right leg */}
+              <mesh position={[0.065, 0.09, 0]} castShadow>
+                <cylinderGeometry args={[0.045, 0.045, 0.18, 6]} />
+                <meshLambertMaterial color={isUnitOnCooldown ? UNIT_DIM_COLOR[unit.player] : UNIT_BASE_COLOR[unit.player]} />
+              </mesh>
+              {/* Torso */}
+              <mesh position={[0, 0.29, 0]} castShadow>
+                <boxGeometry args={[0.2, 0.2, 0.13]} />
+                <meshLambertMaterial color={isUnitOnCooldown ? UNIT_DIM_COLOR[unit.player] : UNIT_BASE_COLOR[unit.player]} />
+              </mesh>
+              {/* Left arm */}
+              <mesh position={[-0.15, 0.28, 0]} rotation={[0, 0, Math.PI / 5]} castShadow>
+                <cylinderGeometry args={[0.035, 0.035, 0.18, 6]} />
+                <meshLambertMaterial color={isUnitOnCooldown ? UNIT_DIM_COLOR[unit.player] : UNIT_BASE_COLOR[unit.player]} />
+              </mesh>
+              {/* Right arm */}
+              <mesh position={[0.15, 0.28, 0]} rotation={[0, 0, -Math.PI / 5]} castShadow>
+                <cylinderGeometry args={[0.035, 0.035, 0.18, 6]} />
+                <meshLambertMaterial color={isUnitOnCooldown ? UNIT_DIM_COLOR[unit.player] : UNIT_BASE_COLOR[unit.player]} />
+              </mesh>
+              {/* Head (skin tone) */}
+              <mesh position={[0, 0.48, 0]} castShadow>
+                <sphereGeometry args={[0.09, 8, 8]} />
+                <meshLambertMaterial color={isUnitOnCooldown ? '#d4a06a' : '#fbbf24'} />
+              </mesh>
+              {/* Helmet */}
+              <mesh position={[0, 0.535, 0]}>
+                <cylinderGeometry args={[0.11, 0.09, 0.07, 8]} />
+                <meshLambertMaterial color={isUnitOnCooldown ? UNIT_DIM_COLOR[unit.player] : UNIT_BASE_COLOR[unit.player]} />
+              </mesh>
+            </group>
           )}
           {unit.type === 'Tank' && (
             <>

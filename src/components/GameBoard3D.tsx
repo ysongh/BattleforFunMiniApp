@@ -1,6 +1,7 @@
-import { useRef } from 'react';
-import { Canvas, type ThreeEvent } from '@react-three/fiber';
+import { useRef, useState, useEffect } from 'react';
+import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
+import * as THREE from 'three';
 import type { Tile, Unit, TerrainType, City } from '../types/game';
 
 // ── Terrain visual config ──────────────────────────────────────────────────
@@ -232,6 +233,175 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isUnitOnCooldown, cool
   );
 }
 
+// ── Death animation component ──────────────────────────────────────────────
+
+interface DyingEntry {
+  unit: Unit;
+  gx: number;
+  gy: number;
+  h: number;
+  startTime: number;
+}
+
+const DEATH_DURATION = 600; // ms
+
+// ── Smoke particles ────────────────────────────────────────────────────────
+
+const SMOKE_COUNT = 7;
+
+// Stable per-particle random offsets (generated once per mount)
+function makeParticles() {
+  return Array.from({ length: SMOKE_COUNT }, () => ({
+    dx: (Math.random() - 0.5) * 0.6,
+    dz: (Math.random() - 0.5) * 0.6,
+    speed: 0.9 + Math.random() * 0.8,
+    size: 0.06 + Math.random() * 0.07,
+    delay: Math.random() * 0.25, // fraction of DEATH_DURATION before this puff appears
+  }));
+}
+
+function SmokeParticles({ startTime }: { startTime: number }) {
+  const refs = useRef<(THREE.Mesh | null)[]>([]);
+  const particles = useRef(makeParticles());
+
+  useFrame(() => {
+    const elapsed = (performance.now() - startTime) / DEATH_DURATION; // 0..1+
+
+    particles.current.forEach((p, i) => {
+      const mesh = refs.current[i];
+      if (!mesh) return;
+
+      const localT = Math.max(0, (elapsed - p.delay) / (1 - p.delay));
+      if (localT <= 0) { mesh.visible = false; return; }
+
+      const t = Math.min(localT, 1);
+      mesh.visible = true;
+      mesh.position.set(p.dx * t, 0.6 + p.speed * t, p.dz * t);
+      mesh.scale.setScalar(1 + t * 0.8);
+
+      const mat = mesh.material as THREE.MeshLambertMaterial;
+      mat.opacity = (1 - t) * 0.55;
+    });
+  });
+
+  return (
+    <>
+      {particles.current.map((p, i) => (
+        <mesh
+          key={i}
+          ref={el => { refs.current[i] = el; }}
+          visible={false}
+        >
+          <sphereGeometry args={[p.size, 6, 6]} />
+          <meshLambertMaterial color="white" transparent opacity={0} depthWrite={false} />
+        </mesh>
+      ))}
+    </>
+  );
+}
+
+function DyingUnit({ entry, onDone }: { entry: DyingEntry; onDone: (id: string) => void }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const done = useRef(false);
+
+  useFrame(() => {
+    if (done.current || !groupRef.current) return;
+    const elapsed = performance.now() - entry.startTime;
+    const t = Math.min(elapsed / DEATH_DURATION, 1);
+
+    groupRef.current.scale.set(1 - t * 0.8, 1 - t, 1 - t * 0.8);
+    groupRef.current.position.y = entry.h - t * 0.15;
+    groupRef.current.rotation.z = t * (Math.PI / 3);
+
+    groupRef.current.traverse(obj => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.isMesh && mesh.material) {
+        const mat = mesh.material as THREE.MeshLambertMaterial;
+        if (!mat.transparent) {
+          mat.transparent = true;
+          mat.needsUpdate = true;
+        }
+        mat.opacity = 1 - t;
+      }
+    });
+
+    if (t >= 1) {
+      done.current = true;
+      onDone(entry.unit.id);
+    }
+  });
+
+  const { unit, gx, gy, h } = entry;
+  const color = UNIT_BASE_COLOR[unit.player];
+  const dimColor = UNIT_DIM_COLOR[unit.player];
+
+  return (
+    <group ref={groupRef} position={[gx, h, gy]}>
+      <SmokeParticles startTime={entry.startTime} />
+      {unit.type === 'Infantry' && (
+        <group>
+          <mesh position={[-0.065, 0.09, 0]}>
+            <cylinderGeometry args={[0.045, 0.045, 0.18, 6]} />
+            <meshLambertMaterial color={color} />
+          </mesh>
+          <mesh position={[0.065, 0.09, 0]}>
+            <cylinderGeometry args={[0.045, 0.045, 0.18, 6]} />
+            <meshLambertMaterial color={color} />
+          </mesh>
+          <mesh position={[0, 0.29, 0]}>
+            <boxGeometry args={[0.2, 0.2, 0.13]} />
+            <meshLambertMaterial color={color} />
+          </mesh>
+          <mesh position={[-0.15, 0.28, 0]} rotation={[0, 0, Math.PI / 5]}>
+            <cylinderGeometry args={[0.035, 0.035, 0.18, 6]} />
+            <meshLambertMaterial color={color} />
+          </mesh>
+          <mesh position={[0.15, 0.28, 0]} rotation={[0, 0, -Math.PI / 5]}>
+            <cylinderGeometry args={[0.035, 0.035, 0.18, 6]} />
+            <meshLambertMaterial color={color} />
+          </mesh>
+          <mesh position={[0, 0.48, 0]}>
+            <sphereGeometry args={[0.09, 8, 8]} />
+            <meshLambertMaterial color="#fbbf24" />
+          </mesh>
+          <mesh position={[0, 0.535, 0]}>
+            <cylinderGeometry args={[0.11, 0.09, 0.07, 8]} />
+            <meshLambertMaterial color={color} />
+          </mesh>
+        </group>
+      )}
+      {unit.type === 'Tank' && (
+        <>
+          <mesh position={[0, 0.14, 0]}>
+            <boxGeometry args={[0.42, 0.28, 0.42]} />
+            <meshLambertMaterial color={color} />
+          </mesh>
+          <mesh position={[0, 0.32, 0]}>
+            <boxGeometry args={[0.26, 0.18, 0.26]} />
+            <meshLambertMaterial color={dimColor} />
+          </mesh>
+          <mesh position={[0.28, 0.32, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.04, 0.04, 0.3, 6]} />
+            <meshLambertMaterial color="#374151" />
+          </mesh>
+        </>
+      )}
+      {unit.type === 'Artillery' && (
+        <>
+          <mesh position={[0, 0.1, 0]}>
+            <boxGeometry args={[0.38, 0.2, 0.38]} />
+            <meshLambertMaterial color={color} />
+          </mesh>
+          <mesh position={[0.18, 0.28, 0]} rotation={[0, 0, -Math.PI / 5]}>
+            <cylinderGeometry args={[0.05, 0.05, 0.46, 6]} />
+            <meshLambertMaterial color="#374151" />
+          </mesh>
+        </>
+      )}
+    </group>
+  );
+}
+
 // ── Grid scene (inside Canvas) ─────────────────────────────────────────────
 
 interface GridSceneProps {
@@ -257,6 +427,46 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
     const cd = unitCooldowns[id];
     if (!cd || now >= cd) return 0;
     return Math.ceil((cd - now) / 1000);
+  };
+
+  // ── Dying unit tracking ──────────────────────────────────────────────────
+  const [dyingUnits, setDyingUnits] = useState<Map<string, DyingEntry>>(new Map);
+  const prevUnitsRef = useRef<Map<string, { unit: Unit; gx: number; gy: number; h: number }>>(new Map());
+
+  useEffect(() => {
+    const currentUnitIds = new Set<string>();
+    for (const row of grid)
+      for (const tile of row)
+        if (tile.unit) currentUnitIds.add(tile.unit.id);
+
+    const newDying = new Map<string, DyingEntry>();
+    prevUnitsRef.current.forEach((entry, id) => {
+      if (!currentUnitIds.has(id) && !dyingUnits.has(id)) {
+        newDying.set(id, { ...entry, startTime: performance.now() });
+      }
+    });
+
+    if (newDying.size > 0) {
+      setDyingUnits(prev => new Map([...prev, ...newDying]));
+    }
+
+    // Update prev snapshot
+    const snapshot = new Map<string, { unit: Unit; gx: number; gy: number; h: number }>();
+    for (const row of grid)
+      for (const tile of row)
+        if (tile.unit) {
+          const [gx, gy] = tile.position;
+          snapshot.set(tile.unit.id, { unit: tile.unit, gx, gy, h: TERRAIN_HEIGHT[tile.terrain.type] });
+        }
+    prevUnitsRef.current = snapshot;
+  }, [grid]);
+
+  const removeDyingUnit = (id: string) => {
+    setDyingUnits(prev => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
   };
 
   return (
@@ -300,6 +510,11 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
           );
         })
       )}
+
+      {/* Dying unit animations */}
+      {[...dyingUnits.values()].map(entry => (
+        <DyingUnit key={entry.unit.id} entry={entry} onDone={removeDyingUnit} />
+      ))}
     </>
   );
 }

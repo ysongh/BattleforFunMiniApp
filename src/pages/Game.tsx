@@ -481,9 +481,7 @@ const Game = () => {
       const distance = Math.abs(enemyX - ax) + Math.abs(enemyY - ay);
       if (updatedDefender.attackRange === 1 && distance <= 1) {
         const attackerTerrain = updatedGrid[ay][ax].terrain;
-        const counterDamage = Math.max(1, Math.round(
-          calculateDamage(updatedDefender, unit, attackerTerrain) * (updatedDefender.health / 100)
-        ));
+        const counterDamage = calculateDamage(updatedDefender, unit, attackerTerrain);
         const updatedAttacker = { ...unit, health: unit.health - counterDamage };
         if (updatedAttacker.health <= 0) {
           updatedGrid[ay][ax].unit = null;
@@ -541,9 +539,7 @@ const Game = () => {
       const distance = Math.abs(x - ax) + Math.abs(y - ay);
       if (updatedDefender.attackRange === 1 && distance <= 1) {
         const attackerTerrain = grid[ay][ax].terrain;
-        const counterDamage = Math.max(1, Math.round(
-          calculateDamage(updatedDefender, attacker, attackerTerrain) * (updatedDefender.health / 100)
-        ));
+        const counterDamage = calculateDamage(updatedDefender, attacker, attackerTerrain);
         const updatedAttacker = { ...attacker, health: attacker.health - counterDamage };
         if (updatedAttacker.health <= 0) {
           updatedGrid[ay][ax].unit = null;

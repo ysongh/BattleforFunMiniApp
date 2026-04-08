@@ -8,6 +8,7 @@ import { GRID_SIZE, COOLDOWN_DURATION, AP_REGEN_INTERVAL, AI_ACTION_INTERVAL, MA
 import { generateInitialGrid, calculateMovementRange as calcMovementRange, calculateAttackRange as calcAttackRange, findEnemiesInRange as findEnemies } from '../lib/grid';
 import { createUnit } from '../lib/units';
 import GameBoard3D from '../components/GameBoard3D';
+import { playAttack, playCounterAttack, playImpact, playDestroyed, playSelect, playMove, playCaptured, playVictory, playDefeat } from '../lib/sounds';
 import {
   IconSword,
   IconShield,
@@ -44,6 +45,7 @@ const Game = () => {
   const [unitCooldowns, setUnitCooldowns] = useState<Record<string, number>>({});
   const [now, setNow] = useState(Date.now());
   const [attackEvent, setAttackEvent] = useState<{ attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number } | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
 
   // Action menu state: shown after moving near enemies or onto a capturable city
   const [actionMenu, setActionMenu] = useState<{
@@ -119,8 +121,12 @@ const Game = () => {
 
     if (action.type === 'attack') {
       setGameStatus(`AI ${action.unit.type} attacked!`);
+      playAttack(isMuted);
       setAttackEvent({ attackerPos: action.unit.position, defenderPos: [action.targetX, action.targetY], timestamp: performance.now() });
       setTimeout(() => setAttackEvent(null), 800);
+      const defenderAfter = action.newGrid[action.targetY][action.targetX].unit;
+      if (!defenderAfter) setTimeout(() => playDestroyed(isMuted), 450);
+      else setTimeout(() => playImpact(isMuted), 450);
       // Check win
       if (countPlayerUnits(action.newGrid, 'Red') === 0) {
         setGameStatus('Blue wins!');
@@ -231,6 +237,7 @@ const Game = () => {
     }
 
     setSelectedUnit(unit);
+    playSelect(isMuted);
     centerViewportOn(x, y);
 
     // Check for nearby actions: capture or attack
@@ -313,6 +320,7 @@ const Game = () => {
       return;
     }
 
+    playMove(isMuted);
     const updatedGrid = [...grid];
     const [oldX, oldY] = unit.position;
     updatedGrid[oldY][oldX].unit = null;
@@ -397,6 +405,7 @@ const Game = () => {
       city.owner = unit.player;
       city.captureProgress = 0;
       setResources(prev => ({ ...prev, [unit.player]: prev[unit.player] + 1000 }));
+      playCaptured(isMuted);
       setGameStatus(`${unit.player} captured a city! +$1000`);
     } else {
       setGameStatus(`Capturing: ${city.captureProgress}/20`);
@@ -473,11 +482,14 @@ const Game = () => {
     const damage = calculateDamage(unit, defender, terrain);
     const updatedDefender = { ...defender, health: defender.health - damage };
 
+    playAttack(isMuted);
     if (updatedDefender.health <= 0) {
       updatedGrid[enemyY][enemyX].unit = null;
+      setTimeout(() => playDestroyed(isMuted), 450);
       setGameStatus(`${defender.type} destroyed!`);
     } else {
       updatedGrid[enemyY][enemyX].unit = updatedDefender;
+      setTimeout(() => playImpact(isMuted), 450);
 
       // Counter-attack: close-range enemy strikes back based on its remaining health
       const [ax, ay] = unit.position;
@@ -488,9 +500,11 @@ const Game = () => {
         const updatedAttacker = { ...unit, health: unit.health - counterDamage };
         if (updatedAttacker.health <= 0) {
           updatedGrid[ay][ax].unit = null;
+          setTimeout(() => { playCounterAttack(isMuted); setTimeout(() => playDestroyed(isMuted), 300); }, 600);
           setGameStatus(`${defender.type} took ${damage} dmg and counter-attacked, destroying ${unit.type}!`);
         } else {
           updatedGrid[ay][ax].unit = updatedAttacker;
+          setTimeout(() => playCounterAttack(isMuted), 600);
           setGameStatus(`${defender.type} took ${damage} dmg and counter-attacked for ${counterDamage}!`);
         }
       } else {
@@ -512,10 +526,12 @@ const Game = () => {
     if (countPlayerUnits(updatedGrid, 'Blue') === 0) {
       setGameStatus('Red wins!');
       gameOverRef.current = true;
+      playVictory(isMuted);
     }
     if (countPlayerUnits(updatedGrid, 'Red') === 0) {
       setGameStatus('Blue wins!');
       gameOverRef.current = true;
+      playDefeat(isMuted);
     }
   };
 
@@ -533,11 +549,14 @@ const Game = () => {
     const damage = calculateDamage(attacker, defender, terrain);
     const updatedDefender = { ...defender, health: defender.health - damage };
 
+    playAttack(isMuted);
     if (updatedDefender.health <= 0) {
       updatedGrid[y][x].unit = null;
+      setTimeout(() => playDestroyed(isMuted), 450);
       setGameStatus(`${defender.type} destroyed!`);
     } else {
       updatedGrid[y][x].unit = updatedDefender;
+      setTimeout(() => playImpact(isMuted), 450);
 
       // Counter-attack: close-range enemy strikes back based on its remaining health
       const [ax, ay] = attacker.position;
@@ -548,9 +567,11 @@ const Game = () => {
         const updatedAttacker = { ...attacker, health: attacker.health - counterDamage };
         if (updatedAttacker.health <= 0) {
           updatedGrid[ay][ax].unit = null;
+          setTimeout(() => { playCounterAttack(isMuted); setTimeout(() => playDestroyed(isMuted), 300); }, 600);
           setGameStatus(`${defender.type} took ${damage} dmg and counter-attacked, destroying ${attacker.type}!`);
         } else {
           updatedGrid[ay][ax].unit = updatedAttacker;
+          setTimeout(() => playCounterAttack(isMuted), 600);
           setGameStatus(`${defender.type} took ${damage} dmg and counter-attacked for ${counterDamage}!`);
         }
       } else {
@@ -571,10 +592,12 @@ const Game = () => {
     if (countPlayerUnits(updatedGrid, 'Blue') === 0) {
       setGameStatus('Red wins!');
       gameOverRef.current = true;
+      playVictory(isMuted);
     }
     if (countPlayerUnits(updatedGrid, 'Red') === 0) {
       setGameStatus('Blue wins!');
       gameOverRef.current = true;
+      playDefeat(isMuted);
     }
   };
 
@@ -614,7 +637,16 @@ const Game = () => {
 
   return (
     <div className="flex flex-col items-center p-2 bg-gray-100 min-h-screen">
-      <h1 className="text-2xl font-bold mb-2">Battle for Fun</h1>
+      <div className="flex items-center gap-3 mb-2">
+        <h1 className="text-2xl font-bold">Battle for Fun</h1>
+        <button
+          onClick={() => setIsMuted(m => !m)}
+          className="text-lg px-2 py-0.5 rounded bg-white shadow hover:bg-gray-100 border"
+          title={isMuted ? 'Unmute' : 'Mute'}
+        >
+          {isMuted ? '🔇' : '🔊'}
+        </button>
+      </div>
 
       <div className="flex flex-wrap gap-2 mb-2 justify-center">
         {/* Status & AP panel */}

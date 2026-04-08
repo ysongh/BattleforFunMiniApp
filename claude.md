@@ -27,7 +27,10 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 - **Health System**: Units have HP, attack, and defense values shown as floating labels
 - **Movement and Attack Ranges**: Highlighted via colored overlay planes (blue = move, red = attack, yellow = selected)
 - **City Capture & Funds**: Infantry can capture neutral/enemy cities; capturing awards $1000
-- **Counter-Attack System**: Close-range enemies (Infantry, Tank) retaliate when attacked; counter-damage scales with defender's remaining health
+- **Counter-Attack System**: Close-range enemies (Infantry, Tank) retaliate when attacked; damage uses the same formula as a normal attack
+- **Death Animation**: Defeated units play a fall-and-fade animation (collapse, tilt, sink) with rising white smoke particles over 600ms
+- **Attack Animation**: Attacks fire an orange projectile ball that arcs from attacker to defender over 450ms, followed by a yellow impact flash on landing
+- **Sound Effects**: Synthesized audio via Tone.js for all combat events — attack, impact, destroy, counter-attack, move, select, capture, victory, defeat; mute toggle in the UI
 
 ### AI Features
 
@@ -44,6 +47,7 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 - **3D Rendering**: `@react-three/fiber` v9 + `@react-three/drei` v9 + `three` v0.183
 - **Routing**: React Router v7
 - **Icons**: Tabler Icons
+- **Sound**: Tone.js (synthesized, no audio files)
 - **Build Tool**: Vite
 
 ## Game Mechanics
@@ -81,7 +85,7 @@ damage = max(10, attacker.attack - (defender.defense + terrain_defense_bonus))
 
 2. **Counter-Attack**: When a close-range enemy (`attackRange === 1`) survives a hit and the attacker is adjacent (distance ≤ 1), it immediately retaliates:
 ```typescript
-counterDamage = max(1, round(calculateDamage(defender, attacker, attackerTerrain) * (defender.health / 100)))
+counterDamage = calculateDamage(defender, attacker, attackerTerrain)
 ```
 Artillery (`attackRange === 3`) never counter-attacks.
 
@@ -141,12 +145,15 @@ The 3D board is in `src/components/GameBoard3D.tsx`. It receives pure data props
 Game.tsx (state, logic)
 └── GameBoard3D.tsx (Canvas + OrbitControls)
     └── GridScene (ambientLight, directionalLight, OrbitControls)
-        └── Tile3D × 100 (one per grid cell)
-            ├── Terrain mesh (box with terrain-appropriate height/color)
-            ├── Terrain decoration (mountain peak / forest tree / city buildings)
-            ├── Highlight overlay (blue/red/yellow transparent plane)
-            ├── Unit mesh (cylinder / tank hull+turret / artillery+barrel)
-            └── Html label (HP + cooldown timer via @react-three/drei)
+        ├── Tile3D × 100 (one per grid cell)
+        │   ├── Terrain mesh (box with terrain-appropriate height/color)
+        │   ├── Terrain decoration (mountain peak / forest tree / city buildings)
+        │   ├── Highlight overlay (blue/red/yellow transparent plane)
+        │   ├── Unit mesh (Infantry figure / tank hull+turret / artillery+barrel)
+        │   └── Html label (HP + cooldown timer via @react-three/drei)
+        ├── DyingUnit × N (fall-fade-tilt animation + smoke particles on unit death)
+        ├── Projectile (orange arc ball traveling attacker → defender on attack)
+        └── ImpactFlash (yellow plane burst at defender on projectile arrival)
 ```
 
 ### Terrain Visual Config
@@ -163,7 +170,7 @@ Game.tsx (state, logic)
 
 | Unit | Shape | Notes |
 |------|-------|-------|
-| Infantry | Cylinder | Dimmed when on cooldown |
+| Infantry | Human figure (legs, torso, arms, head, helmet) | Dimmed when on cooldown |
 | Tank | Box hull + box turret + barrel cylinder | Barrel points forward |
 | Artillery | Flat box base + angled long barrel | Barrel elevated ~36° |
 
@@ -191,6 +198,7 @@ src/
 │   ├── combat.ts             # Damage calculation, win condition checks
 │   ├── constants.ts          # Game constants, unit stats, terrain definitions
 │   ├── grid.ts               # Grid generation, movement/attack range, terrain helpers
+│   ├── sounds.ts             # Tone.js synthesized sound effects (8 events)
 │   └── units.ts              # Unit factory (createUnit)
 └── types/
     └── game.ts               # Type definitions (Unit, Tile, Terrain, City, etc.)
@@ -243,6 +251,7 @@ interface GameBoard3DProps {
   unitCooldowns: Record<string, number>;
   now: number;
   onTileClick: (x: number, y: number, screenX: number, screenY: number) => void;
+  attackEvent: { attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number } | null;
 }
 ```
 
@@ -259,6 +268,8 @@ const [resources, setResources] = useState<Record<Player, number>>({ Red: 1000, 
 const [menuAnchor, setMenuAnchor] = useState<{ left: number; top: number; openAbove: boolean } | null>(null);
 const [isAIEnabled, setIsAIEnabled] = useState(false);
 const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+const [attackEvent, setAttackEvent] = useState<{ attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number } | null>(null);
+const [isMuted, setIsMuted] = useState(false);
 ```
 
 ## Future Enhancements
@@ -272,7 +283,6 @@ const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('me
 ### 3D / Visual
 
 - Unit movement animation: tween position from old to new tile
-- Attack animation: flash/shake effect on hit
 - Camera auto-pan: smooth camera follow when selecting units
 - Terrain shadows and ambient occlusion
 
@@ -284,12 +294,11 @@ const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('me
 
 ### Technical
 
-- Sound effects for attacks and movement
 - Multiplayer (online)
 - Save/Load game state
 - Mobile touch controls optimized for 3D
 
 ---
 
-Version: 1.3.0
+Version: 1.4.0
 Last Updated: April 2026

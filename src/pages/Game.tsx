@@ -43,6 +43,7 @@ const Game = () => {
   const [actionPoints, setActionPoints] = useState<Record<Player, number>>({ Red: 5, Blue: 5 });
   const [unitCooldowns, setUnitCooldowns] = useState<Record<string, number>>({});
   const [now, setNow] = useState(Date.now());
+  const [attackEvent, setAttackEvent] = useState<{ attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number } | null>(null);
 
   // Action menu state: shown after moving near enemies or onto a capturable city
   const [actionMenu, setActionMenu] = useState<{
@@ -118,6 +119,8 @@ const Game = () => {
 
     if (action.type === 'attack') {
       setGameStatus(`AI ${action.unit.type} attacked!`);
+      setAttackEvent({ attackerPos: action.unit.position, defenderPos: [action.targetX, action.targetY], timestamp: performance.now() });
+      setTimeout(() => setAttackEvent(null), 800);
       // Check win
       if (countPlayerUnits(action.newGrid, 'Red') === 0) {
         setGameStatus('Blue wins!');
@@ -495,6 +498,8 @@ const Game = () => {
       }
     }
 
+    setAttackEvent({ attackerPos: unit.position, defenderPos: [enemyX, enemyY], timestamp: performance.now() });
+    setTimeout(() => setAttackEvent(null), 800);
     setGrid(updatedGrid);
     // Only deduct AP if the unit didn't already spend AP on moving
     if (!justMoved) {
@@ -553,6 +558,8 @@ const Game = () => {
       }
     }
 
+    setAttackEvent({ attackerPos: attacker.position, defenderPos: [x, y], timestamp: performance.now() });
+    setTimeout(() => setAttackEvent(null), 800);
     setGrid(updatedGrid);
     setActionPoints(prev => ({ ...prev, Red: prev.Red - 1 }));
     setUnitCooldowns(prev => ({ ...prev, [attacker.id]: Date.now() + COOLDOWN_DURATION }));
@@ -704,6 +711,7 @@ const Game = () => {
           unitCooldowns={unitCooldowns}
           now={now}
           onTileClick={handleTileClick}
+          attackEvent={attackEvent}
         />
       </div>
 

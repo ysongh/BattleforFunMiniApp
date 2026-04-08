@@ -402,6 +402,79 @@ function DyingUnit({ entry, onDone }: { entry: DyingEntry; onDone: (id: string) 
   );
 }
 
+// ── Attack animations ──────────────────────────────────────────────────────
+
+const PROJECTILE_DURATION = 450; // ms — travel time attacker → defender
+const FLASH_DURATION = 280;      // ms — impact flash fade
+
+function Projectile({ attackerPos, defenderPos, ah, dh, startTime }: {
+  attackerPos: [number, number];
+  defenderPos: [number, number];
+  ah: number;
+  dh: number;
+  startTime: number;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  const pdx = defenderPos[0] - attackerPos[0];
+  const pdz = defenderPos[1] - attackerPos[1];
+  const dist = Math.sqrt(pdx * pdx + pdz * pdz);
+  const arcHeight = 0.5 + dist * 0.18; // taller arc for longer shots
+
+  useFrame(() => {
+    if (!meshRef.current) return;
+    const elapsed = performance.now() - startTime;
+    const t = Math.min(elapsed / PROJECTILE_DURATION, 1);
+
+    const x = attackerPos[0] + pdx * t;
+    const z = attackerPos[1] + pdz * t;
+    const baseY = ah + (dh - ah) * t + 0.35; // start slightly above tile
+    const arcY = Math.sin(t * Math.PI) * arcHeight;
+
+    meshRef.current.position.set(x, baseY + arcY, z);
+    meshRef.current.visible = t < 1;
+  });
+
+  return (
+    <mesh ref={meshRef} position={[attackerPos[0], ah + 0.35, attackerPos[1]]} visible={false}>
+      <sphereGeometry args={[0.08, 8, 8]} />
+      <meshLambertMaterial color="#f97316" />
+    </mesh>
+  );
+}
+
+function ImpactFlash({ defenderPos, h, startTime, delay }: {
+  defenderPos: [number, number];
+  h: number;
+  startTime: number;
+  delay: number;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame(() => {
+    if (!meshRef.current) return;
+    const elapsed = performance.now() - (startTime + delay);
+    if (elapsed < 0) { meshRef.current.visible = false; return; }
+    const t = Math.min(elapsed / FLASH_DURATION, 1);
+    meshRef.current.visible = true;
+    const mat = meshRef.current.material as THREE.MeshLambertMaterial;
+    mat.opacity = (1 - t) * 0.9;
+    meshRef.current.scale.setScalar(1 + t * 0.8);
+  });
+
+  return (
+    <mesh
+      ref={meshRef}
+      position={[defenderPos[0], h + 0.04, defenderPos[1]]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      visible={false}
+    >
+      <planeGeometry args={[0.9, 0.9]} />
+      <meshLambertMaterial color="#fbbf24" transparent opacity={0} depthWrite={false} />
+    </mesh>
+  );
+}
+
 // ── Grid scene (inside Canvas) ─────────────────────────────────────────────
 
 interface GridSceneProps {
@@ -412,9 +485,10 @@ interface GridSceneProps {
   unitCooldowns: Record<string, number>;
   now: number;
   onTileClick: (x: number, y: number, screenX: number, screenY: number) => void;
+  attackEvent: { attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number } | null;
 }
 
-function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldowns, now, onTileClick }: GridSceneProps) {
+function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldowns, now, onTileClick, attackEvent }: GridSceneProps) {
   const moveSet = new Set(movementRange.map(([x, y]) => `${x},${y}`));
   const attackSet = new Set(attackRange.map(([x, y]) => `${x},${y}`));
 
@@ -515,6 +589,36 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
       {[...dyingUnits.values()].map(entry => (
         <DyingUnit key={entry.unit.id} entry={entry} onDone={removeDyingUnit} />
       ))}
+
+      {/* Attack animations */}
+      {attackEvent && (() => {
+        const [ax, ay] = attackEvent.attackerPos;
+        const [dx, dy] = attackEvent.defenderPos;
+        const attackerTile = grid[ay]?.[ax];
+        const defenderTile = grid[dy]?.[dx];
+        if (!attackerTile || !defenderTile) return null;
+        const ah = TERRAIN_HEIGHT[attackerTile.terrain.type];
+        const dh = TERRAIN_HEIGHT[defenderTile.terrain.type];
+        return (
+          <>
+            <Projectile
+              key={attackEvent.timestamp}
+              attackerPos={attackEvent.attackerPos}
+              defenderPos={attackEvent.defenderPos}
+              ah={ah}
+              dh={dh}
+              startTime={attackEvent.timestamp}
+            />
+            <ImpactFlash
+              key={`flash-${attackEvent.timestamp}`}
+              defenderPos={attackEvent.defenderPos}
+              h={dh}
+              startTime={attackEvent.timestamp}
+              delay={PROJECTILE_DURATION - 30}
+            />
+          </>
+        );
+      })()}
     </>
   );
 }
@@ -529,6 +633,7 @@ export interface GameBoard3DProps {
   unitCooldowns: Record<string, number>;
   now: number;
   onTileClick: (x: number, y: number, screenX: number, screenY: number) => void;
+  attackEvent: { attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number } | null;
 }
 
 export default function GameBoard3D(props: GameBoard3DProps) {

@@ -45,12 +45,15 @@ interface TileProps {
   isSelected: boolean;
   isMovement: boolean;
   isAttack: boolean;
+  isHovered: boolean;
   isUnitOnCooldown: boolean;
   cooldownSecs: number;
   onClick: (e: ThreeEvent<MouseEvent>) => void;
+  onPointerOver: (e: ThreeEvent<PointerEvent>) => void;
+  onPointerOut: (e: ThreeEvent<PointerEvent>) => void;
 }
 
-function Tile3D({ tile, isSelected, isMovement, isAttack, isUnitOnCooldown, cooldownSecs, onClick }: TileProps) {
+function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCooldown, cooldownSecs, onClick, onPointerOver, onPointerOut }: TileProps) {
   const [gx, gy] = tile.position;
   const terrainType = tile.terrain.type;
   const h = TERRAIN_HEIGHT[terrainType];
@@ -71,7 +74,7 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isUnitOnCooldown, cool
   const cityOwnerKey = city?.owner ?? 'none';
 
   return (
-    <group position={[gx, 0, gy]} onClick={onClick}>
+    <group position={[gx, 0, gy]} onClick={onClick} onPointerOver={onPointerOver} onPointerOut={onPointerOut}>
 
       {/* Base tile */}
       <mesh position={[0, h / 2, 0]} receiveShadow>
@@ -127,6 +130,14 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isUnitOnCooldown, cool
         <mesh position={[0, h + 0.015, 0]}>
           <boxGeometry args={[0.96, 0.03, 0.96]} />
           <meshLambertMaterial color={highlightColor} transparent opacity={0.55} />
+        </mesh>
+      )}
+
+      {/* Hover overlay */}
+      {isHovered && (
+        <mesh position={[0, h + 0.03, 0]}>
+          <boxGeometry args={[0.96, 0.03, 0.96]} />
+          <meshLambertMaterial color="#ffffff" transparent opacity={0.28} />
         </mesh>
       )}
 
@@ -491,6 +502,7 @@ interface GridSceneProps {
 function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldowns, now, onTileClick, attackEvent }: GridSceneProps) {
   const moveSet = new Set(movementRange.map(([x, y]) => `${x},${y}`));
   const attackSet = new Set(attackRange.map(([x, y]) => `${x},${y}`));
+  const [hoveredTile, setHoveredTile] = useState<string | null>(null);
 
   const isUnitOnCooldown = (id: string) => {
     const cd = unitCooldowns[id];
@@ -574,11 +586,20 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
               isSelected={isSel}
               isMovement={moveSet.has(key)}
               isAttack={attackSet.has(key)}
+              isHovered={hoveredTile === key}
               isUnitOnCooldown={onCd}
               cooldownSecs={cdSecs}
               onClick={(e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
                 onTileClick(tx, ty, e.nativeEvent.clientX, e.nativeEvent.clientY);
+              }}
+              onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+                e.stopPropagation();
+                setHoveredTile(key);
+              }}
+              onPointerOut={(e: ThreeEvent<PointerEvent>) => {
+                e.stopPropagation();
+                setHoveredTile(prev => prev === key ? null : prev);
               }}
             />
           );

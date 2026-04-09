@@ -26,6 +26,7 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 - **Multiple Unit Types**: Infantry, Tanks, Artillery with distinct 3D shapes and stats
 - **Health System**: Units have HP, attack, and defense values shown as floating labels
 - **Movement and Attack Ranges**: Highlighted via colored overlay planes (blue = move, red = attack, yellow = selected)
+- **Hover Highlight**: Mousing over any tile shows a white semi-transparent overlay; visible on plain tiles and brightens movement/attack/selected highlights
 - **City Capture & Funds**: Infantry can capture neutral/enemy cities; capturing awards $1000
 - **Counter-Attack System**: Close-range enemies (Infantry, Tank) retaliate when attacked; damage uses the same formula as a normal attack
 - **Death Animation**: Defeated units play a fall-and-fade animation (collapse, tilt, sink) with rising white smoke particles over 600ms
@@ -149,6 +150,7 @@ Game.tsx (state, logic)
         │   ├── Terrain mesh (box with terrain-appropriate height/color)
         │   ├── Terrain decoration (mountain peak / forest tree / city buildings)
         │   ├── Highlight overlay (blue/red/yellow transparent plane)
+        │   ├── Hover overlay (white transparent plane on pointer-over)
         │   ├── Unit mesh (Infantry figure / tank hull+turret / artillery+barrel)
         │   └── Html label (HP + cooldown timer via @react-three/drei)
         ├── DyingUnit × N (fall-fade-tilt animation + smoke particles on unit death)
@@ -300,5 +302,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.4.0
+Version: 1.5.0
 Last Updated: April 2026

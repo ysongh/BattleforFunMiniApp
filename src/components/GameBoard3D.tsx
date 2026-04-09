@@ -161,13 +161,13 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCoo
                 <boxGeometry args={[0.2, 0.2, 0.13]} />
                 <meshLambertMaterial color={isUnitOnCooldown ? UNIT_DIM_COLOR[unit.player] : UNIT_BASE_COLOR[unit.player]} />
               </mesh>
-              {/* Left arm */}
-              <mesh position={[-0.15, 0.28, 0]} rotation={[0, 0, Math.PI / 5]} castShadow>
+              {/* Left arm — support hand on barrel */}
+              <mesh position={[0.02, 0.37, -0.07]} rotation={[-0.5, 0, 0.15]} castShadow>
                 <cylinderGeometry args={[0.035, 0.035, 0.18, 6]} />
                 <meshLambertMaterial color={isUnitOnCooldown ? UNIT_DIM_COLOR[unit.player] : UNIT_BASE_COLOR[unit.player]} />
               </mesh>
-              {/* Right arm */}
-              <mesh position={[0.15, 0.28, 0]} rotation={[0, 0, -Math.PI / 5]} castShadow>
+              {/* Right arm — trigger hand gripping stock */}
+              <mesh position={[0.13, 0.32, 0.03]} rotation={[-0.55, 0, -0.2]} castShadow>
                 <cylinderGeometry args={[0.035, 0.035, 0.18, 6]} />
                 <meshLambertMaterial color={isUnitOnCooldown ? UNIT_DIM_COLOR[unit.player] : UNIT_BASE_COLOR[unit.player]} />
               </mesh>
@@ -180,6 +180,16 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCoo
               <mesh position={[0, 0.535, 0]}>
                 <cylinderGeometry args={[0.11, 0.09, 0.07, 8]} />
                 <meshLambertMaterial color={isUnitOnCooldown ? UNIT_DIM_COLOR[unit.player] : UNIT_BASE_COLOR[unit.player]} />
+              </mesh>
+              {/* Rifle stock — at right shoulder */}
+              <mesh position={[0.1, 0.38, 0.1]} rotation={[-Math.PI / 2 + 0.2, 0, 0.06]}>
+                <boxGeometry args={[0.04, 0.09, 0.04]} />
+                <meshLambertMaterial color="#78350f" />
+              </mesh>
+              {/* Rifle barrel — pointing forward with slight upward angle */}
+              <mesh position={[0.07, 0.42, -0.06]} rotation={[-Math.PI / 2 + 0.2, 0, 0.06]}>
+                <cylinderGeometry args={[0.015, 0.015, 0.28, 6]} />
+                <meshLambertMaterial color="#1f2937" />
               </mesh>
             </group>
           )}
@@ -363,11 +373,11 @@ function DyingUnit({ entry, onDone }: { entry: DyingEntry; onDone: (id: string) 
             <boxGeometry args={[0.2, 0.2, 0.13]} />
             <meshLambertMaterial color={color} />
           </mesh>
-          <mesh position={[-0.15, 0.28, 0]} rotation={[0, 0, Math.PI / 5]}>
+          <mesh position={[0.02, 0.37, -0.07]} rotation={[-0.5, 0, 0.15]}>
             <cylinderGeometry args={[0.035, 0.035, 0.18, 6]} />
             <meshLambertMaterial color={color} />
           </mesh>
-          <mesh position={[0.15, 0.28, 0]} rotation={[0, 0, -Math.PI / 5]}>
+          <mesh position={[0.13, 0.32, 0.03]} rotation={[-0.55, 0, -0.2]}>
             <cylinderGeometry args={[0.035, 0.035, 0.18, 6]} />
             <meshLambertMaterial color={color} />
           </mesh>
@@ -378,6 +388,16 @@ function DyingUnit({ entry, onDone }: { entry: DyingEntry; onDone: (id: string) 
           <mesh position={[0, 0.535, 0]}>
             <cylinderGeometry args={[0.11, 0.09, 0.07, 8]} />
             <meshLambertMaterial color={color} />
+          </mesh>
+          {/* Rifle stock — at right shoulder */}
+          <mesh position={[0.1, 0.38, 0.1]} rotation={[-Math.PI / 2 + 0.2, 0, 0.06]}>
+            <boxGeometry args={[0.04, 0.09, 0.04]} />
+            <meshLambertMaterial color="#78350f" />
+          </mesh>
+          {/* Rifle barrel — pointing forward with slight upward angle */}
+          <mesh position={[0.07, 0.42, -0.06]} rotation={[-Math.PI / 2 + 0.2, 0, 0.06]}>
+            <cylinderGeometry args={[0.015, 0.015, 0.28, 6]} />
+            <meshLambertMaterial color="#1f2937" />
           </mesh>
         </group>
       )}

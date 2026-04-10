@@ -516,7 +516,7 @@ interface GridSceneProps {
   unitCooldowns: Record<string, number>;
   now: number;
   onTileClick: (x: number, y: number, screenX: number, screenY: number) => void;
-  attackEvent: { attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number } | null;
+  attackEvent: { attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number; hasCounter: boolean } | null;
 }
 
 function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldowns, now, onTileClick, attackEvent }: GridSceneProps) {
@@ -642,6 +642,7 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
         const dh = TERRAIN_HEIGHT[defenderTile.terrain.type];
         return (
           <>
+            {/* Initial attack projectile */}
             <Projectile
               key={attackEvent.timestamp}
               attackerPos={attackEvent.attackerPos}
@@ -657,6 +658,26 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
               startTime={attackEvent.timestamp}
               delay={PROJECTILE_DURATION - 30}
             />
+            {/* Counter-attack projectile — fires after first ball lands */}
+            {attackEvent.hasCounter && (
+              <>
+                <Projectile
+                  key={`counter-${attackEvent.timestamp}`}
+                  attackerPos={attackEvent.defenderPos}
+                  defenderPos={attackEvent.attackerPos}
+                  ah={dh}
+                  dh={ah}
+                  startTime={attackEvent.timestamp + PROJECTILE_DURATION}
+                />
+                <ImpactFlash
+                  key={`counter-flash-${attackEvent.timestamp}`}
+                  defenderPos={attackEvent.attackerPos}
+                  h={ah}
+                  startTime={attackEvent.timestamp + PROJECTILE_DURATION}
+                  delay={PROJECTILE_DURATION - 30}
+                />
+              </>
+            )}
           </>
         );
       })()}
@@ -674,7 +695,7 @@ export interface GameBoard3DProps {
   unitCooldowns: Record<string, number>;
   now: number;
   onTileClick: (x: number, y: number, screenX: number, screenY: number) => void;
-  attackEvent: { attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number } | null;
+  attackEvent: { attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number; hasCounter: boolean } | null;
 }
 
 export default function GameBoard3D(props: GameBoard3DProps) {

@@ -30,7 +30,7 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 - **City Capture & Funds**: Infantry can capture neutral/enemy cities; capturing awards $1000
 - **Counter-Attack System**: Close-range enemies (Infantry, Tank) retaliate when attacked; damage uses the same formula as a normal attack
 - **Death Animation**: Defeated units play a fall-and-fade animation (collapse, tilt, sink) with rising white smoke particles over 600ms
-- **Attack Animation**: Attacks fire an orange projectile ball that arcs from attacker to defender over 450ms, followed by a yellow impact flash on landing
+- **Attack Animation**: Attacks fire an orange projectile ball that arcs from attacker to defender over 450ms, followed by a yellow impact flash on landing; counter-attacks fire a second projectile back immediately after the first lands
 - **Sound Effects**: Synthesized audio via Tone.js for all combat events — attack, impact, destroy, counter-attack, move, select, capture, victory, defeat; mute toggle in the UI
 
 ### AI Features
@@ -155,7 +155,8 @@ Game.tsx (state, logic)
         │   └── Html label (HP + cooldown timer via @react-three/drei)
         ├── DyingUnit × N (fall-fade-tilt animation + smoke particles on unit death)
         ├── Projectile (orange arc ball traveling attacker → defender on attack)
-        └── ImpactFlash (yellow plane burst at defender on projectile arrival)
+        ├── Projectile (second ball defender → attacker for counter-attacks)
+        └── ImpactFlash × 1-2 (yellow plane burst at impact point; two shown when counter-attack occurs)
 ```
 
 ### Terrain Visual Config
@@ -172,7 +173,7 @@ Game.tsx (state, logic)
 
 | Unit | Shape | Notes |
 |------|-------|-------|
-| Infantry | Human figure (legs, torso, arms, head, helmet) | Dimmed when on cooldown |
+| Infantry | Human figure (legs, torso, arms, head, helmet) holding an aiming rifle (brown stock + dark barrel) | Dimmed when on cooldown |
 | Tank | Box hull + box turret + barrel cylinder | Barrel points forward |
 | Artillery | Flat box base + angled long barrel | Barrel elevated ~36° |
 
@@ -253,7 +254,7 @@ interface GameBoard3DProps {
   unitCooldowns: Record<string, number>;
   now: number;
   onTileClick: (x: number, y: number, screenX: number, screenY: number) => void;
-  attackEvent: { attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number } | null;
+  attackEvent: { attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number; hasCounter: boolean } | null;
 }
 ```
 
@@ -270,7 +271,7 @@ const [resources, setResources] = useState<Record<Player, number>>({ Red: 1000, 
 const [menuAnchor, setMenuAnchor] = useState<{ left: number; top: number; openAbove: boolean } | null>(null);
 const [isAIEnabled, setIsAIEnabled] = useState(false);
 const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
-const [attackEvent, setAttackEvent] = useState<{ attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number } | null>(null);
+const [attackEvent, setAttackEvent] = useState<{ attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number; hasCounter: boolean } | null>(null);
 const [isMuted, setIsMuted] = useState(false);
 ```
 
@@ -302,5 +303,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.5.0
+Version: 1.6.0
 Last Updated: April 2026

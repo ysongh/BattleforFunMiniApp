@@ -44,7 +44,7 @@ const Game = () => {
   const [actionPoints, setActionPoints] = useState<Record<Player, number>>({ Red: 5, Blue: 5 });
   const [unitCooldowns, setUnitCooldowns] = useState<Record<string, number>>({});
   const [now, setNow] = useState(Date.now());
-  const [attackEvent, setAttackEvent] = useState<{ attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number } | null>(null);
+  const [attackEvent, setAttackEvent] = useState<{ attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number; hasCounter: boolean } | null>(null);
   const [isMuted, setIsMuted] = useState(false);
 
   // Action menu state: shown after moving near enemies or onto a capturable city
@@ -122,7 +122,7 @@ const Game = () => {
     if (action.type === 'attack') {
       setGameStatus(`AI ${action.unit.type} attacked!`);
       playAttack(isMuted);
-      setAttackEvent({ attackerPos: action.unit.position, defenderPos: [action.targetX, action.targetY], timestamp: performance.now() });
+      setAttackEvent({ attackerPos: action.unit.position, defenderPos: [action.targetX, action.targetY], timestamp: performance.now(), hasCounter: false });
       setTimeout(() => setAttackEvent(null), 800);
       const defenderAfter = action.newGrid[action.targetY][action.targetX].unit;
       if (!defenderAfter) setTimeout(() => playDestroyed(isMuted), 450);
@@ -482,6 +482,7 @@ const Game = () => {
     const damage = calculateDamage(unit, defender, terrain);
     const updatedDefender = { ...defender, health: defender.health - damage };
 
+    let didCounter = false;
     playAttack(isMuted);
     if (updatedDefender.health <= 0) {
       updatedGrid[enemyY][enemyX].unit = null;
@@ -495,6 +496,7 @@ const Game = () => {
       const [ax, ay] = unit.position;
       const distance = Math.abs(enemyX - ax) + Math.abs(enemyY - ay);
       if (updatedDefender.attackRange === 1 && distance <= 1) {
+        didCounter = true;
         const attackerTerrain = updatedGrid[ay][ax].terrain;
         const counterDamage = calculateDamage(updatedDefender, unit, attackerTerrain);
         const updatedAttacker = { ...unit, health: unit.health - counterDamage };
@@ -512,8 +514,8 @@ const Game = () => {
       }
     }
 
-    setAttackEvent({ attackerPos: unit.position, defenderPos: [enemyX, enemyY], timestamp: performance.now() });
-    setTimeout(() => setAttackEvent(null), 800);
+    setAttackEvent({ attackerPos: unit.position, defenderPos: [enemyX, enemyY], timestamp: performance.now(), hasCounter: didCounter });
+    setTimeout(() => setAttackEvent(null), didCounter ? 1400 : 800);
     setGrid(updatedGrid);
     // Only deduct AP if the unit didn't already spend AP on moving
     if (!justMoved) {
@@ -549,6 +551,7 @@ const Game = () => {
     const damage = calculateDamage(attacker, defender, terrain);
     const updatedDefender = { ...defender, health: defender.health - damage };
 
+    let didCounter = false;
     playAttack(isMuted);
     if (updatedDefender.health <= 0) {
       updatedGrid[y][x].unit = null;
@@ -562,6 +565,7 @@ const Game = () => {
       const [ax, ay] = attacker.position;
       const distance = Math.abs(x - ax) + Math.abs(y - ay);
       if (updatedDefender.attackRange === 1 && distance <= 1) {
+        didCounter = true;
         const attackerTerrain = grid[ay][ax].terrain;
         const counterDamage = calculateDamage(updatedDefender, attacker, attackerTerrain);
         const updatedAttacker = { ...attacker, health: attacker.health - counterDamage };
@@ -579,8 +583,8 @@ const Game = () => {
       }
     }
 
-    setAttackEvent({ attackerPos: attacker.position, defenderPos: [x, y], timestamp: performance.now() });
-    setTimeout(() => setAttackEvent(null), 800);
+    setAttackEvent({ attackerPos: attacker.position, defenderPos: [x, y], timestamp: performance.now(), hasCounter: didCounter });
+    setTimeout(() => setAttackEvent(null), didCounter ? 1400 : 800);
     setGrid(updatedGrid);
     setActionPoints(prev => ({ ...prev, Red: prev.Red - 1 }));
     setUnitCooldowns(prev => ({ ...prev, [attacker.id]: Date.now() + COOLDOWN_DURATION }));

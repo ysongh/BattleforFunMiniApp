@@ -640,60 +640,64 @@ const Game = () => {
   // --- Render ---
 
   return (
-    <div className="flex flex-col items-center p-2 bg-gray-100 min-h-screen">
-      <div className="flex items-center gap-3 mb-2">
-        <h1 className="text-2xl font-bold">Battle for Fun</h1>
+    <div className="flex flex-col bg-gray-100 h-screen overflow-hidden">
+      {/* Header */}
+      <header className="flex items-center justify-between px-4 py-2 bg-white shadow z-10 shrink-0">
+        <h1 className="text-xl font-bold">Battle for Fun</h1>
         <button
           onClick={() => setIsMuted(m => !m)}
-          className="text-lg px-2 py-0.5 rounded bg-white shadow hover:bg-gray-100 border"
+          className="text-lg px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 border"
           title={isMuted ? 'Unmute' : 'Mute'}
         >
           {isMuted ? '🔇' : '🔊'}
         </button>
-      </div>
+      </header>
 
-      <div className="flex flex-wrap gap-2 mb-2 justify-center">
-        {/* Status & AP panel */}
-        <div className="bg-white p-2 rounded shadow">
-          <p className="text-sm mb-1">{gameStatus}</p>
-          <div className="flex gap-4 mb-2">
-            <p className="text-red-600 font-bold">Red: ${resources.Red}</p>
-            <p className="text-blue-600 font-bold">Blue: ${resources.Blue}</p>
-          </div>
+      {/* Main layout: sidebar + board + sidebar on desktop */}
+      <div className="flex flex-col lg:flex-row flex-1 gap-2 p-2 min-h-0 overflow-y-auto lg:overflow-hidden">
 
-          {/* AP Display */}
-          <div className="mb-2">
-            <div className="flex items-center gap-2 mb-1">
-              <IconBolt size={14} className="text-red-600" />
-              <span className="text-xs font-semibold text-red-600">Red:</span>
-              <div className="flex gap-0.5">
-                {Array.from({ length: MAX_AP }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-3 h-3 rounded-sm ${i < actionPoints.Red ? 'bg-red-500' : 'bg-gray-200'}`}
-                  />
-                ))}
-              </div>
-              <span className="text-xs font-bold text-red-600">{actionPoints.Red}</span>
+        {/* Left sidebar — status, AP, controls */}
+        <aside className="flex flex-col gap-2 lg:w-56 xl:w-64 shrink-0 lg:overflow-y-auto">
+          {/* Status & resources */}
+          <div className="bg-white p-3 rounded shadow">
+            <p className="text-sm font-medium mb-2 text-gray-700">{gameStatus}</p>
+            <div className="flex gap-4 mb-3">
+              <p className="text-red-600 font-bold text-sm">Red: ${resources.Red}</p>
+              <p className="text-blue-600 font-bold text-sm">Blue: ${resources.Blue}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <IconBolt size={14} className="text-blue-600" />
-              <span className="text-xs font-semibold text-blue-600">Blue:</span>
-              <div className="flex gap-0.5">
-                {Array.from({ length: MAX_AP }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-3 h-3 rounded-sm ${i < actionPoints.Blue ? 'bg-blue-500' : 'bg-gray-200'}`}
-                  />
-                ))}
-              </div>
-              <span className="text-xs font-bold text-blue-600">{actionPoints.Blue}</span>
-            </div>
-          </div>
 
-          <div className="flex gap-2 mt-2">
+            {/* AP Display */}
+            <div className="space-y-1 mb-3">
+              <div className="flex items-center gap-2">
+                <IconBolt size={14} className="text-red-600 shrink-0" />
+                <span className="text-xs font-semibold text-red-600 w-8">Red:</span>
+                <div className="flex gap-0.5">
+                  {Array.from({ length: MAX_AP }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-3 h-3 rounded-sm ${i < actionPoints.Red ? 'bg-red-500' : 'bg-gray-200'}`}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs font-bold text-red-600">{actionPoints.Red}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <IconBolt size={14} className="text-blue-600 shrink-0" />
+                <span className="text-xs font-semibold text-blue-600 w-8">Blue:</span>
+                <div className="flex gap-0.5">
+                  {Array.from({ length: MAX_AP }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-3 h-3 rounded-sm ${i < actionPoints.Blue ? 'bg-blue-500' : 'bg-gray-200'}`}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs font-bold text-blue-600">{actionPoints.Blue}</span>
+              </div>
+            </div>
+
             <button
-              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
+              className="w-full bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded text-sm flex items-center justify-center gap-1"
               onClick={cycleToNextUnit}
             >
               <IconPlayerTrackNext size={14} /> Next Unit
@@ -701,12 +705,12 @@ const Game = () => {
           </div>
 
           {/* AI Controls */}
-          <div className="mt-2 border-t pt-2">
-            <div className="flex items-center gap-2 mb-1">
+          <div className="bg-white p-3 rounded shadow">
+            <div className="flex items-center gap-2 mb-2">
               <IconRobot size={14} className="text-gray-600" />
               <span className="text-xs font-semibold">AI (Blue):</span>
               <button
-                className={`px-2 py-0.5 text-xs rounded flex items-center gap-1 ${isAIEnabled ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                className={`px-2 py-0.5 text-xs rounded ${isAIEnabled ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
                 onClick={() => setIsAIEnabled(v => !v)}
               >
                 {isAIEnabled ? 'ON' : 'OFF'}
@@ -726,29 +730,49 @@ const Game = () => {
               </div>
             )}
           </div>
+        </aside>
+
+        {/* Center — 3D board (fills remaining space) */}
+        <div className="flex-1 min-w-0 min-h-[420px] lg:min-h-0 lg:h-full">
+          <GameBoard3D
+            grid={grid}
+            selectedUnit={selectedUnit}
+            movementRange={movementRange}
+            attackRange={attackRange}
+            unitCooldowns={unitCooldowns}
+            now={now}
+            onTileClick={handleTileClick}
+            attackEvent={attackEvent}
+          />
         </div>
 
-        {/* Camera hint */}
-        <div className="bg-white p-2 rounded shadow text-xs text-gray-500 self-center">
-          <p className="font-semibold text-gray-700 mb-0.5">Camera</p>
-          <p>Drag — rotate</p>
-          <p>Scroll — zoom</p>
-          <p>Right-drag — pan</p>
-        </div>
-      </div>
+        {/* Right sidebar — camera hints + how to play */}
+        <aside className="flex flex-col gap-2 lg:w-48 xl:w-56 shrink-0 lg:overflow-y-auto">
+          {/* Camera hint */}
+          <div className="bg-white p-3 rounded shadow text-xs text-gray-500">
+            <p className="font-semibold text-gray-700 mb-1">Camera</p>
+            <p>Drag — rotate</p>
+            <p>Scroll — zoom</p>
+            <p>Right-drag — pan</p>
+          </div>
 
-      {/* 3D Board */}
-      <div className="w-full max-w-3xl">
-        <GameBoard3D
-          grid={grid}
-          selectedUnit={selectedUnit}
-          movementRange={movementRange}
-          attackRange={attackRange}
-          unitCooldowns={unitCooldowns}
-          now={now}
-          onTileClick={handleTileClick}
-          attackEvent={attackEvent}
-        />
+          {/* How to Play */}
+          <div className="bg-white p-3 rounded shadow">
+            <h3 className="font-semibold text-sm mb-1">How to Play</h3>
+            <ul className="list-disc pl-4 text-xs space-y-0.5 mb-2">
+              <li>Click a Red unit to select it</li>
+              <li><span className="text-blue-500 font-semibold">Blue</span> = move, <span className="text-red-500 font-semibold">Red</span> = attack (1 AP each)</li>
+              <li>Units go on <span className="text-orange-500 font-semibold">60s cooldown</span> after acting</li>
+              <li>AP: +1 every 60s (max 10)</li>
+            </ul>
+            <h3 className="font-semibold text-sm mb-1">Unit Types</h3>
+            <div className="text-xs space-y-0.5">
+              <p className="flex items-center gap-1"><IconSword size={12} /> Infantry — Basic</p>
+              <p className="flex items-center gap-1"><IconShield size={12} /> Tank — Strong</p>
+              <p className="flex items-center gap-1"><IconTarget size={12} /> Artillery — Long range</p>
+            </div>
+          </div>
+        </aside>
       </div>
 
       {/* Factory menu portal */}
@@ -839,28 +863,6 @@ const Game = () => {
         document.body
       )}
 
-      {/* How to Play */}
-      <div className="mt-2 bg-white p-2 rounded shadow w-full max-w-md">
-        <div className="flex justify-between">
-          <div>
-            <h3 className="font-semibold text-sm">How to Play:</h3>
-            <ul className="list-disc pl-4 text-xs">
-              <li>Click a Red unit to select it</li>
-              <li>Move (<span className="text-blue-500 font-semibold">blue</span>) or attack (<span className="text-red-500 font-semibold">red</span>) — each costs 1 AP</li>
-              <li>After acting, units go on <span className="text-orange-500 font-semibold">60s cooldown</span></li>
-              <li>AP regenerates: +1 every 60 seconds (max 10)</li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-sm">Unit Types:</h3>
-            <div className="text-xs space-y-0.5">
-              <p className="flex items-center gap-1"><IconSword size={12} /> Infantry - Basic unit</p>
-              <p className="flex items-center gap-1"><IconShield size={12} /> Tank - Strong attack</p>
-              <p className="flex items-center gap-1"><IconTarget size={12} /> Artillery - Long range</p>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

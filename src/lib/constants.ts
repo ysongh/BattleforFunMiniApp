@@ -2,7 +2,7 @@ import type { UnitType, Terrain, TerrainType, Unit } from '../types/game';
 
 export const GRID_SIZE = 10;
 export const COOLDOWN_DURATION = 10000; // 10 seconds
-export const AP_REGEN_INTERVAL = 20000; // 1 AP every 20 seconds
+export const AP_REGEN_INTERVAL = 10000; // 1 AP every 10 seconds
 export const AI_ACTION_INTERVAL = 3000; // AI tries to act every 3 seconds
 export const MAX_AP = 10;
 

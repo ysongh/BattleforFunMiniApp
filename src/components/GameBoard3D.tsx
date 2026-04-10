@@ -704,7 +704,7 @@ export default function GameBoard3D(props: GameBoard3DProps) {
   if (!props.grid.length) return null;
 
   return (
-    <div ref={canvasRef} style={{ width: '100%', height: 520, borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 16px rgba(0,0,0,0.25)' }}>
+    <div ref={canvasRef} style={{ width: '100%', height: '100%', minHeight: 420, borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 16px rgba(0,0,0,0.25)' }}>
       <Canvas
         camera={{ position: [4.5, 13, 16], fov: 42 }}
         shadows

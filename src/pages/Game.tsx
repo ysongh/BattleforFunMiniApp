@@ -115,24 +115,59 @@ const Game = () => {
 
     if (!action) return;
 
-    setGrid(action.newGrid);
     setActionPoints(prev => ({ ...prev, Blue: prev.Blue - 1 }));
     setUnitCooldowns(prev => ({ ...prev, [action.unit.id]: Date.now() + COOLDOWN_DURATION }));
 
     if (action.type === 'attack') {
-      setGameStatus(`AI ${action.unit.type} attacked!`);
-      playAttack(isMuted);
-      setAttackEvent({ attackerPos: action.unit.position, defenderPos: [action.targetX, action.targetY], timestamp: performance.now(), hasCounter: false });
-      setTimeout(() => setAttackEvent(null), 800);
       const defenderAfter = action.newGrid[action.targetY][action.targetX].unit;
+
+      // Counter-attack: if the Red defender survived and is close-range, it retaliates
+      let didCounter = false;
+      if (defenderAfter && defenderAfter.attackRange === 1) {
+        const [ax, ay] = action.unit.position;
+        const distance = Math.abs(action.targetX - ax) + Math.abs(action.targetY - ay);
+        if (distance <= 1) {
+          didCounter = true;
+          const attackerTerrain = action.newGrid[ay][ax].terrain;
+          const counterDamage = calculateDamage(defenderAfter, action.unit, attackerTerrain);
+          const blueUnit = action.newGrid[ay][ax].unit;
+          if (blueUnit) {
+            const newHealth = blueUnit.health - counterDamage;
+            if (newHealth <= 0) {
+              action.newGrid[ay][ax].unit = null;
+              setTimeout(() => { playCounterAttack(isMuted); setTimeout(() => playDestroyed(isMuted), 300); }, 600);
+              setGameStatus(`AI ${action.unit.type} attacked but was destroyed by counter-attack!`);
+            } else {
+              action.newGrid[ay][ax].unit = { ...blueUnit, health: newHealth };
+              setTimeout(() => playCounterAttack(isMuted), 600);
+              setGameStatus(`AI ${action.unit.type} attacked and took ${counterDamage} counter-damage!`);
+            }
+          }
+        }
+      }
+
+      if (!didCounter) {
+        setGameStatus(`AI ${action.unit.type} attacked!`);
+      }
+
+      setGrid(action.newGrid);
+      playAttack(isMuted);
+      setAttackEvent({ attackerPos: action.unit.position, defenderPos: [action.targetX, action.targetY], timestamp: performance.now(), hasCounter: didCounter });
+      setTimeout(() => setAttackEvent(null), didCounter ? 1400 : 800);
       if (!defenderAfter) setTimeout(() => playDestroyed(isMuted), 450);
-      else setTimeout(() => playImpact(isMuted), 450);
-      // Check win
+      else if (!didCounter) setTimeout(() => playImpact(isMuted), 450);
+      // Check win conditions
       if (countPlayerUnits(action.newGrid, 'Red') === 0) {
         setGameStatus('Blue wins!');
         gameOverRef.current = true;
       }
+      if (countPlayerUnits(action.newGrid, 'Blue') === 0) {
+        setGameStatus('Red wins!');
+        gameOverRef.current = true;
+        playVictory(isMuted);
+      }
     } else {
+      setGrid(action.newGrid);
       setGameStatus(`AI ${action.unit.type} moved`);
     }
   }, []);

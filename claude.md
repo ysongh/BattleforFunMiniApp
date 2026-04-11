@@ -28,7 +28,7 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 - **Movement and Attack Ranges**: Highlighted via colored overlay planes (blue = move, red = attack, yellow = selected)
 - **Hover Highlight**: Mousing over any tile shows a white semi-transparent overlay; visible on plain tiles and brightens movement/attack/selected highlights
 - **City Capture & Funds**: Infantry can capture neutral/enemy cities; capturing awards $1000
-- **Counter-Attack System**: Close-range enemies (Infantry, Tank) retaliate when attacked; damage uses the same formula as a normal attack
+- **Counter-Attack System**: Close-range enemies (Infantry, Tank) retaliate when attacked; damage uses the same formula as a normal attack. Counter-attacks apply symmetrically — both when the player attacks AI units and when the AI attacks player units
 - **Death Animation**: Defeated units play a fall-and-fade animation (collapse, tilt, sink) with rising white smoke particles over 600ms
 - **Attack Animation**: Attacks fire an orange projectile ball that arcs from attacker to defender over 450ms, followed by a yellow impact flash on landing; counter-attacks fire a second projectile back immediately after the first lands
 - **Sound Effects**: Synthesized audio via Tone.js for all combat events — attack, impact, destroy, counter-attack, move, select, capture, victory, defeat; mute toggle in the UI
@@ -126,6 +126,10 @@ Game.tsx: tryAIAction() (useCallback)
     ├── Try attack first (difficulty-based targeting)
     └── Fall back to move toward nearest enemy
     └── Returns { type, unit, newGrid } or null
+
+tryAIAction then applies counter-attack damage on top of newGrid before
+calling setGrid — so Red units retaliate against AI attacks just as they
+do against player attacks.
 ```
 
 ### Difficulty Levels
@@ -186,6 +190,21 @@ Game.tsx (state, logic)
 ### Click Handling
 
 Tile clicks use r3f's built-in raycasting. Each `Tile3D` group receives an `onClick` handler that passes the grid coordinate plus the native `clientX/clientY` to `Game.tsx` via `onTileClick(x, y, screenX, screenY)`. The screen coordinates are used to position the action/factory popup menus.
+
+## UI Layout (Desktop)
+
+On `lg+` screens the game uses a three-column layout that fills the full viewport:
+
+- **Left sidebar** (`lg:w-56 xl:w-64`): game status, funds, AP bars, Next Unit button, AI controls
+- **Center** (`flex-1`): 3D board — expands to fill all remaining horizontal and vertical space
+- **Right sidebar** (`lg:w-48 xl:w-56`): camera controls reference, How to Play, unit type legend
+
+On mobile the columns stack vertically and the page is scrollable. The canvas uses `height: 100%` with `minHeight: 420px` so it fills the center column on desktop.
+
+Key CSS entry points:
+- `html, body, #root { height: 100% }` in `src/index.css` — required for `h-screen` on the root game div
+- Root game div: `flex flex-col h-screen overflow-hidden`
+- Main area: `flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden`
 
 ## Project Structure
 
@@ -303,5 +322,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.6.0
+Version: 1.7.0
 Last Updated: April 2026

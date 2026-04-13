@@ -74,7 +74,19 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCoo
   const cityOwnerKey = city?.owner ?? 'none';
 
   return (
-    <group position={[gx, 0, gy]} onClick={onClick} onPointerOver={onPointerOver} onPointerOut={onPointerOut}>
+    <group position={[gx, 0, gy]}>
+
+      {/* Invisible hitbox — single ray target for click/hover, prevents flicker from child mesh transitions */}
+      <mesh
+        position={[0, h + 0.06, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        onClick={onClick}
+        onPointerOver={onPointerOver}
+        onPointerOut={onPointerOut}
+      >
+        <planeGeometry args={[0.96, 0.96]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
 
       {/* Base tile */}
       <mesh position={[0, h / 2, 0]} receiveShadow>

@@ -187,9 +187,13 @@ Game.tsx (state, logic)
 - **OrbitControls**: drag to rotate, scroll to zoom, right-drag to pan
 - `maxPolarAngle`: prevents camera going below ground
 
-### Click Handling
+### Click Handling & Hover Hitbox
 
-Tile clicks use r3f's built-in raycasting. Each `Tile3D` group receives an `onClick` handler that passes the grid coordinate plus the native `clientX/clientY` to `Game.tsx` via `onTileClick(x, y, screenX, screenY)`. The screen coordinates are used to position the action/factory popup menus.
+Each `Tile3D` contains a single invisible `planeGeometry` hitbox mesh positioned just above the tile surface. All pointer events (`onClick`, `onPointerOver`, `onPointerOut`) are attached **only to this hitbox**, not to the `<group>`.
+
+This is intentional — without it, the cursor moving between child meshes (terrain box, highlight plane, hover overlay, unit) causes r3f to fire `onPointerOut` + `onPointerOver` in quick succession as the raycast switches targets, producing a visible one-frame hover flicker. The single hitbox is always the topmost ray target, so hover state changes exactly once on enter and once on exit.
+
+The hitbox passes the grid coordinate plus the native `clientX/clientY` to `Game.tsx` via `onTileClick(x, y, screenX, screenY)`. The screen coordinates are used to position the action/factory popup menus.
 
 ## UI Layout (Desktop)
 

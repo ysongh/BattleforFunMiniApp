@@ -8,6 +8,7 @@ import { GRID_SIZE, COOLDOWN_DURATION, AP_REGEN_INTERVAL, AI_ACTION_INTERVAL, MA
 import { generateInitialGrid, calculateMovementRange as calcMovementRange, calculateAttackRange as calcAttackRange, findEnemiesInRange as findEnemies } from '../lib/grid';
 import { createUnit } from '../lib/units';
 import GameBoard3D from '../components/GameBoard3D';
+import MinimapOverlay from '../components/MinimapOverlay';
 import { playAttack, playCounterAttack, playImpact, playDestroyed, playSelect, playMove, playCaptured, playVictory, playDefeat } from '../lib/sounds';
 import {
   IconSword,
@@ -768,7 +769,7 @@ const Game = () => {
         </aside>
 
         {/* Center — 3D board (fills remaining space) */}
-        <div className="flex-1 min-w-0 min-h-[420px] lg:min-h-0 lg:h-full">
+        <div className="relative flex-1 min-w-0 min-h-[420px] lg:min-h-0 lg:h-full">
           <GameBoard3D
             grid={grid}
             selectedUnit={selectedUnit}
@@ -779,6 +780,7 @@ const Game = () => {
             onTileClick={handleTileClick}
             attackEvent={attackEvent}
           />
+          <MinimapOverlay grid={grid} />
         </div>
 
         {/* Right sidebar — camera hints + how to play */}

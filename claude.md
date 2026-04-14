@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, built with React 19, TypeScript, Tailwind CSS, and `@react-three/fiber` for a 3D battlefield. Players command units on a 10×10 grid rendered in full 3D with an isometric-style perspective camera. The game includes an AI opponent with three difficulty levels.
+BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, built with React 19, TypeScript, Tailwind CSS, `@react-three/fiber` for a 3D battlefield, and MapLibre GL JS for map overlays. Players command units on a 10×10 grid rendered in full 3D with an isometric-style perspective camera. The game includes an AI opponent with three difficulty levels.
 
 ## Table of Contents
 
@@ -32,6 +32,8 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 - **Death Animation**: Defeated units play a fall-and-fade animation (collapse, tilt, sink) with rising white smoke particles over 600ms
 - **Attack Animation**: Attacks fire an orange projectile ball that arcs from attacker to defender over 450ms, followed by a yellow impact flash on landing; counter-attacks fire a second projectile back immediately after the first lands
 - **Sound Effects**: Synthesized audio via Tone.js for all combat events — attack, impact, destroy, counter-attack, move, select, capture, victory, defeat; mute toggle in the UI
+- **MapLibre Terrain Backdrop**: A real-world MapLibre GL JS map (OpenFreeMap bright style, centered on Alsace-Lorraine) renders behind the transparent R3F canvas. The map bearing and pitch sync in real-time with the 3D camera via an imperative `MapLibreBackdropHandle` ref — no React re-renders during camera movement. The R3F canvas uses `gl={{ alpha: true }}` + `scene.background = null` for true compositing transparency.
+- **MapLibre Minimap**: A 144×144px MapLibre map overlaid in the bottom-right corner of the board shows terrain tiles and live unit positions (red/blue dots). Uses a minimal offline style with no external tile server.
 
 ### AI Features
 
@@ -46,6 +48,7 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **3D Rendering**: `@react-three/fiber` v9 + `@react-three/drei` v9 + `three` v0.183
+- **Map Rendering**: `maplibre-gl` — terrain backdrop + minimap overlay
 - **Routing**: React Router v7
 - **Icons**: Tabler Icons
 - **Sound**: Tone.js (synthesized, no audio files)
@@ -148,19 +151,22 @@ The 3D board is in `src/components/GameBoard3D.tsx`. It receives pure data props
 
 ```
 Game.tsx (state, logic)
-└── GameBoard3D.tsx (Canvas + OrbitControls)
-    └── GridScene (ambientLight, directionalLight, OrbitControls)
-        ├── Tile3D × 100 (one per grid cell)
-        │   ├── Terrain mesh (box with terrain-appropriate height/color)
-        │   ├── Terrain decoration (mountain peak / forest tree / city buildings)
-        │   ├── Highlight overlay (blue/red/yellow transparent plane)
-        │   ├── Hover overlay (white transparent plane on pointer-over)
-        │   ├── Unit mesh (Infantry figure / tank hull+turret / artillery+barrel)
-        │   └── Html label (HP + cooldown timer via @react-three/drei)
-        ├── DyingUnit × N (fall-fade-tilt animation + smoke particles on unit death)
-        ├── Projectile (orange arc ball traveling attacker → defender on attack)
-        ├── Projectile (second ball defender → attacker for counter-attacks)
-        └── ImpactFlash × 1-2 (yellow plane burst at impact point; two shown when counter-attack occurs)
+├── MapLibreBackdrop.tsx (absolute z:0 — real-world map behind the canvas)
+├── GameBoard3D.tsx (relative z:1 — transparent Canvas + OrbitControls)
+│   └── GridScene (ambientLight, directionalLight, OrbitControls)
+│       ├── useFrame → computes bearing/pitch → calls mapBackdropRef.setCamera()
+│       ├── Tile3D × 100 (one per grid cell)
+│       │   ├── Terrain mesh (box with terrain-appropriate height/color)
+│       │   ├── Terrain decoration (mountain peak / forest tree / city buildings)
+│       │   ├── Highlight overlay (blue/red/yellow transparent plane)
+│       │   ├── Hover overlay (white transparent plane on pointer-over)
+│       │   ├── Unit mesh (Infantry figure / tank hull+turret / artillery+barrel)
+│       │   └── Html label (HP + cooldown timer via @react-three/drei)
+│       ├── DyingUnit × N (fall-fade-tilt animation + smoke particles on unit death)
+│       ├── Projectile (orange arc ball traveling attacker → defender on attack)
+│       ├── Projectile (second ball defender → attacker for counter-attacks)
+│       └── ImpactFlash × 1-2 (yellow plane burst at impact point; two shown when counter-attack occurs)
+└── MinimapOverlay.tsx (absolute z:10 bottom-right — unit position minimap)
 ```
 
 ### Terrain Visual Config
@@ -186,6 +192,23 @@ Game.tsx (state, logic)
 - **Initial position**: `[4.5, 13, 16]` looking toward `[4.5, 0, 4.5]`
 - **OrbitControls**: drag to rotate, scroll to zoom, right-drag to pan
 - `maxPolarAngle`: prevents camera going below ground
+
+### MapLibre Backdrop Sync
+
+`GridScene` runs a `useFrame` loop that computes **bearing** and **pitch** from the Three.js camera position relative to the orbit target `[4.5, 0, 4.5]`:
+
+```typescript
+bearing = atan2(dx, -dz) * (180 / π)           // clockwise from –Z (north)
+pitch   = clamp(90 − atan2(dy, horiz) * (180/π), 0, 60)  // MapLibre: 0=top-down, 60=horizon
+```
+
+Updates are throttled to fire only when either value changes by >0.4°. Changes are pushed imperatively via `mapBackdropRef.current.setCamera(bearing, pitch)` — no React state update, no re-render. `MapLibreBackdrop` calls `map.jumpTo({ bearing, pitch })` for instant (zero-lag) sync.
+
+### Canvas Transparency
+
+The R3F `Canvas` uses `gl={{ alpha: true }}` and `onCreated={({ gl, scene }) => { gl.setClearColor(0x000000, 0); scene.background = null; }}`. Both `gl.setClearColor` (clears the WebGL buffer to transparent) and `scene.background = null` (prevents Three.js from painting over the clear) are required for compositing over the MapLibre backdrop.
+
+The board container in `Game.tsx` uses CSS stacking: `MapLibreBackdrop` at `position: absolute; z-index: 0`, `GameBoard3D` wrapper at `position: relative; z-index: 1`.
 
 ### Click Handling & Hover Hitbox
 
@@ -218,7 +241,9 @@ src/
 │   ├── Game.tsx              # Main game component (state, logic, UI panels)
 │   └── Lobby.tsx             # Pre-game lobby and settings
 ├── components/
-│   └── GameBoard3D.tsx       # 3D canvas: tiles, units, highlights (r3f)
+│   ├── GameBoard3D.tsx       # 3D canvas: tiles, units, highlights (r3f)
+│   ├── MapLibreBackdrop.tsx  # MapLibre real-world map behind the 3D canvas; exposes setCamera() handle
+│   └── MinimapOverlay.tsx    # MapLibre minimap (terrain polygons + unit dots), bottom-right overlay
 ├── lib/
 │   ├── ai.ts                 # AI decision logic (computeAIAction)
 │   ├── combat.ts             # Damage calculation, win condition checks
@@ -237,7 +262,7 @@ src/
 ```bash
 git clone https://github.com/ysongh/BattleforFunMiniApp.git
 cd BattleforFunMiniApp
-npm install
+npm install        # includes maplibre-gl
 npm run dev
 ```
 
@@ -278,8 +303,19 @@ interface GameBoard3DProps {
   now: number;
   onTileClick: (x: number, y: number, screenX: number, screenY: number) => void;
   attackEvent: { attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number; hasCounter: boolean } | null;
+  mapBackdropRef?: React.RefObject<MapLibreBackdropHandle | null>;  // optional; camera sync to MapLibre
 }
 ```
+
+### MapLibreBackdropHandle
+
+```typescript
+export interface MapLibreBackdropHandle {
+  setCamera: (bearing: number, pitch: number) => void;
+}
+```
+
+Obtained via `useRef<MapLibreBackdropHandle | null>(null)` in `Game.tsx` and passed as `ref` to `<MapLibreBackdrop>`.
 
 ### Key State in Game.tsx
 
@@ -326,5 +362,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.7.0
+Version: 1.8.0
 Last Updated: April 2026

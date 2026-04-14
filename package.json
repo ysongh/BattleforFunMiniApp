@@ -14,8 +14,6 @@
     "@farcaster/miniapp-wagmi-connector": "^1.1.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
-    "@reown/appkit": "^1.8.13",
-    "@reown/appkit-adapter-wagmi": "^1.8.13",
     "@tabler/icons-react": "^3.40.0",
     "@tailwindcss/vite": "^4.1.4",
     "@tanstack/react-query": "5.45.1",

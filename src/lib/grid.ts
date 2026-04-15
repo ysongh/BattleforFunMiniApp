@@ -21,58 +21,61 @@ export const getCityOwnerColor = (city: City): string => {
   return city.owner === 'Red' ? 'border-red-600' : 'border-blue-600';
 };
 
-export const generateInitialGrid = (): Tile[][] => {
+/**
+ * Build the initial 10×10 grid.
+ *
+ * When `terrainOverride` is supplied (real OSM data from realMap.ts) the
+ * terrain types come directly from that array and the random painting pass
+ * is skipped entirely.  When omitted the original random generation runs.
+ */
+export const generateInitialGrid = (terrainOverride?: TerrainType[][]): Tile[][] => {
   const grid: Tile[][] = [];
-  const terrainTypes = Object.keys(TERRAIN_TYPES) as TerrainType[];
 
   for (let y = 0; y < GRID_SIZE; y++) {
     grid[y] = [];
     for (let x = 0; x < GRID_SIZE; x++) {
-      const randomTerrainIndex = Math.floor(Math.random() * terrainTypes.length);
+      const type: TerrainType = terrainOverride?.[y]?.[x] ?? 'Plain';
       grid[y][x] = {
         position: [x, y],
-        terrain: TERRAIN_TYPES[terrainTypes[randomTerrainIndex]],
+        terrain: TERRAIN_TYPES[type],
         unit: null,
       };
     }
   }
 
-  for (let i = 0; i < 30; i++) {
-    const x = Math.floor(Math.random() * GRID_SIZE);
-    const y = Math.floor(Math.random() * GRID_SIZE);
-    grid[y][x].terrain = TERRAIN_TYPES.Mountain;
-  }
-
-  for (let i = 0; i < 40; i++) {
-    const x = Math.floor(Math.random() * GRID_SIZE);
-    const y = Math.floor(Math.random() * GRID_SIZE);
-    grid[y][x].terrain = TERRAIN_TYPES.Forest;
-  }
-
-  for (let i = 0; i < 15; i++) {
-    const x = Math.floor(Math.random() * GRID_SIZE);
-    const y = Math.floor(Math.random() * GRID_SIZE);
-    grid[y][x].terrain = TERRAIN_TYPES.City;
-  }
-
-  for (let i = 0; i < 3; i++) {
-    const startX = Math.floor(Math.random() * GRID_SIZE);
-    let x = startX;
-    for (let y = 0; y < GRID_SIZE; y++) {
-      grid[y][x].terrain = TERRAIN_TYPES.Road;
-      if (Math.random() > 0.7 && x > 0 && x < GRID_SIZE - 1) {
-        x += Math.random() > 0.5 ? 1 : -1;
+  // Only apply random terrain painting when no real-world data was provided.
+  if (!terrainOverride) {
+    for (let i = 0; i < 30; i++) {
+      const x = Math.floor(Math.random() * GRID_SIZE);
+      const y = Math.floor(Math.random() * GRID_SIZE);
+      grid[y][x].terrain = TERRAIN_TYPES.Mountain;
+    }
+    for (let i = 0; i < 40; i++) {
+      const x = Math.floor(Math.random() * GRID_SIZE);
+      const y = Math.floor(Math.random() * GRID_SIZE);
+      grid[y][x].terrain = TERRAIN_TYPES.Forest;
+    }
+    for (let i = 0; i < 15; i++) {
+      const x = Math.floor(Math.random() * GRID_SIZE);
+      const y = Math.floor(Math.random() * GRID_SIZE);
+      grid[y][x].terrain = TERRAIN_TYPES.City;
+    }
+    for (let i = 0; i < 3; i++) {
+      const startX = Math.floor(Math.random() * GRID_SIZE);
+      let x = startX;
+      for (let y = 0; y < GRID_SIZE; y++) {
+        grid[y][x].terrain = TERRAIN_TYPES.Road;
+        if (Math.random() > 0.7 && x > 0 && x < GRID_SIZE - 1)
+          x += Math.random() > 0.5 ? 1 : -1;
       }
     }
-  }
-
-  for (let i = 0; i < 3; i++) {
-    const startY = Math.floor(Math.random() * GRID_SIZE);
-    let y = startY;
-    for (let x = 0; x < GRID_SIZE; x++) {
-      grid[y][x].terrain = TERRAIN_TYPES.Road;
-      if (Math.random() > 0.7 && y > 0 && y < GRID_SIZE - 1) {
-        y += Math.random() > 0.5 ? 1 : -1;
+    for (let i = 0; i < 3; i++) {
+      const startY = Math.floor(Math.random() * GRID_SIZE);
+      let y = startY;
+      for (let x = 0; x < GRID_SIZE; x++) {
+        grid[y][x].terrain = TERRAIN_TYPES.Road;
+        if (Math.random() > 0.7 && y > 0 && y < GRID_SIZE - 1)
+          y += Math.random() > 0.5 ? 1 : -1;
       }
     }
   }

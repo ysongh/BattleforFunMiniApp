@@ -9,6 +9,15 @@ import { generateInitialGrid, calculateMovementRange as calcMovementRange, calcu
 import { createUnit } from '../lib/units';
 import GameBoard3D from '../components/GameBoard3D';
 import MinimapOverlay from '../components/MinimapOverlay';
+import MapLibreBackdrop, { type MapLibreBackdropHandle } from '../components/MapLibreBackdrop';
+import { fetchRealTerrain } from '../lib/realMap';
+import type { TerrainType } from '../types/game';
+
+// ── Real-world game location ───────────────────────────────────────────────
+// Central Park / Upper West Side, NYC — varied terrain: avenues (Road),
+// Central Park (Forest), Reservoir (Mountain/water), urban blocks (City/Plain).
+const MAP_CENTER: [number, number] = [-73.9712, 40.7831]; // [lng, lat]
+const MAP_ZOOM = 15;
 import { playAttack, playCounterAttack, playImpact, playDestroyed, playSelect, playMove, playCaptured, playVictory, playDefeat } from '../lib/sounds';
 import {
   IconSword,
@@ -47,6 +56,7 @@ const Game = () => {
   const [now, setNow] = useState(Date.now());
   const [attackEvent, setAttackEvent] = useState<{ attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number; hasCounter: boolean } | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [terrainLoading, setTerrainLoading] = useState(true);
 
   // Action menu state: shown after moving near enemies or onto a capturable city
   const [actionMenu, setActionMenu] = useState<{
@@ -69,6 +79,9 @@ const Game = () => {
   // AI state
   const [isAIEnabled, setIsAIEnabled] = useState(lobbyState?.isAIEnabled ?? false);
   const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>(lobbyState?.aiDifficulty ?? 'medium');
+
+  // MapLibre backdrop — imperative ref so camera syncs without re-renders
+  const mapBackdropRef = useRef<MapLibreBackdropHandle | null>(null);
 
   // Refs for use inside intervals (avoids stale closures)
   const gridRef = useRef<Tile[][]>([]);
@@ -100,8 +113,20 @@ const Game = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Initialize game
-  useEffect(() => { initializeGame(); }, []);
+  // Initialize game — fetch real-world terrain first, then build the grid
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setTerrainLoading(true);
+      const terrain: TerrainType[][] | null = await fetchRealTerrain(MAP_CENTER[0], MAP_CENTER[1]);
+      if (!cancelled) {
+        initializeGame(terrain ?? undefined);
+        setTerrainLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // AI action interval
   const tryAIAction = useCallback(() => {
@@ -179,8 +204,25 @@ const Game = () => {
     return () => clearInterval(interval);
   }, [isAIEnabled, tryAIAction]);
 
-  const initializeGame = () => {
-    const initialGrid = generateInitialGrid();
+  /** Find the nearest passable (non-water), unoccupied tile in the search area. */
+  const findPassableTile = (grid: Tile[][], prefX: number, prefY: number): [number, number] => {
+    for (let r = 0; r <= 4; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.abs(dx) + Math.abs(dy) !== r) continue; // ring only
+          const nx = prefX + dx, ny = prefY + dy;
+          if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
+          if (grid[ny][nx].terrain.type !== 'Mountain' && !grid[ny][nx].unit) {
+            return [nx, ny];
+          }
+        }
+      }
+    }
+    return [prefX, prefY]; // fallback
+  };
+
+  const initializeGame = (terrainOverride?: TerrainType[][]) => {
+    const initialGrid = generateInitialGrid(terrainOverride);
 
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {
@@ -194,36 +236,40 @@ const Game = () => {
       }
     }
 
-    let redCityAssigned = false;
-    let blueCityAssigned = false;
-
-    for (let y = 0; y < GRID_SIZE && (!redCityAssigned || !blueCityAssigned); y++) {
-      for (let x = 0; x < GRID_SIZE; x++) {
-        const terrain = initialGrid[y][x].terrain;
-        if (terrain.type === 'City') {
-          if (!redCityAssigned && y < 3) {
-            (terrain as City).owner = 'Red';
-            redCityAssigned = true;
-          } else if (!blueCityAssigned && y >= GRID_SIZE - 3) {
-            (terrain as City).owner = 'Blue';
-            blueCityAssigned = true;
+    // Assign owned cities — if none exist in the start zones, create one on the
+    // nearest passable tile so the factory mechanic always works.
+    const ensureCity = (zone: 'top' | 'bottom', owner: Player) => {
+      const yRange = zone === 'top' ? [0, 2] : [GRID_SIZE - 3, GRID_SIZE - 1];
+      for (let y = yRange[0]; y <= yRange[1]; y++)
+        for (let x = 0; x < GRID_SIZE; x++)
+          if (initialGrid[y][x].terrain.type === 'City') {
+            (initialGrid[y][x].terrain as City).owner = owner;
+            return;
           }
-        }
-        if (redCityAssigned && blueCityAssigned) break;
-      }
-    }
+      // No city found — convert first passable tile in zone
+      const [cx, cy] = findPassableTile(initialGrid, 2, zone === 'top' ? 1 : GRID_SIZE - 2);
+      initialGrid[cy][cx].terrain = { type: 'City', defenseBonus: 20, movementCost: 1, isCity: true, owner, captureProgress: 0 } as City;
+    };
+    ensureCity('top', 'Red');
+    ensureCity('bottom', 'Blue');
 
-    initialGrid[1][2].unit = createUnit('Infantry', [2, 1], 'Red');
-    initialGrid[2][1].unit = createUnit('Tank', [1, 2], 'Red');
-    initialGrid[3][2].unit = createUnit('Artillery', [2, 3], 'Red');
-    initialGrid[1][4].unit = createUnit('Infantry', [4, 1], 'Red');
-    initialGrid[2][5].unit = createUnit('Infantry', [5, 2], 'Red');
+    // Place units on passable tiles near their preferred start positions
+    const place = (type: UnitType, prefX: number, prefY: number, player: Player) => {
+      const [x, y] = findPassableTile(initialGrid, prefX, prefY);
+      initialGrid[y][x].unit = createUnit(type, [x, y], player);
+    };
 
-    initialGrid[GRID_SIZE - 2][GRID_SIZE - 3].unit = createUnit('Infantry', [GRID_SIZE - 3, GRID_SIZE - 2], 'Blue');
-    initialGrid[GRID_SIZE - 3][GRID_SIZE - 2].unit = createUnit('Tank', [GRID_SIZE - 2, GRID_SIZE - 3], 'Blue');
-    initialGrid[GRID_SIZE - 4][GRID_SIZE - 3].unit = createUnit('Artillery', [GRID_SIZE - 3, GRID_SIZE - 4], 'Blue');
-    initialGrid[GRID_SIZE - 2][GRID_SIZE - 5].unit = createUnit('Infantry', [GRID_SIZE - 5, GRID_SIZE - 2], 'Blue');
-    initialGrid[GRID_SIZE - 3][GRID_SIZE - 6].unit = createUnit('Infantry', [GRID_SIZE - 6, GRID_SIZE - 3], 'Blue');
+    place('Infantry',  2, 1, 'Red');
+    place('Tank',      1, 2, 'Red');
+    place('Artillery', 2, 3, 'Red');
+    place('Infantry',  4, 1, 'Red');
+    place('Infantry',  5, 2, 'Red');
+
+    place('Infantry',  GRID_SIZE - 3, GRID_SIZE - 2, 'Blue');
+    place('Tank',      GRID_SIZE - 2, GRID_SIZE - 3, 'Blue');
+    place('Artillery', GRID_SIZE - 3, GRID_SIZE - 4, 'Blue');
+    place('Infantry',  GRID_SIZE - 5, GRID_SIZE - 2, 'Blue');
+    place('Infantry',  GRID_SIZE - 6, GRID_SIZE - 3, 'Blue');
 
     setGrid(initialGrid);
     gameOverRef.current = false;
@@ -769,7 +815,18 @@ const Game = () => {
         </aside>
 
         {/* Center — 3D board (fills remaining space) */}
-        <div className="relative flex-1 min-w-0 min-h-[420px] lg:min-h-0 lg:h-full">
+        <div className="relative flex-1 min-w-0 min-h-[420px] lg:min-h-0 lg:h-full rounded-lg overflow-hidden shadow-lg">
+          {/* Real-world map backdrop */}
+          <MapLibreBackdrop ref={mapBackdropRef} center={MAP_CENTER} zoom={MAP_ZOOM} />
+
+          {/* Loading overlay while terrain data is fetched */}
+          {terrainLoading && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/70 text-white gap-3">
+              <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+              <p className="text-sm font-semibold tracking-wide">Loading NYC terrain…</p>
+            </div>
+          )}
+
           <GameBoard3D
             grid={grid}
             selectedUnit={selectedUnit}
@@ -779,6 +836,7 @@ const Game = () => {
             now={now}
             onTileClick={handleTileClick}
             attackEvent={attackEvent}
+            mapBackdropRef={mapBackdropRef}
           />
           <MinimapOverlay grid={grid} />
         </div>

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, built with React 19, TypeScript, Tailwind CSS, `@react-three/fiber` for a 3D battlefield, and MapLibre GL JS for map overlays. Players command units on a 10×10 grid rendered in full 3D with an isometric-style perspective camera. The game includes an AI opponent with three difficulty levels.
+BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, built with React 19, TypeScript, Tailwind CSS, `@react-three/fiber` for a 3D battlefield, and MapLibre GL JS for real-world map rendering. Players command units on a 10×10 grid that is overlaid directly on a real OpenStreetMap street map (defaulting to Central Park / Upper West Side, NYC). The game includes an AI opponent with three difficulty levels.
 
 ## Table of Contents
 
@@ -22,18 +22,18 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 ### Core Features
 
 - **Turn-Based Gameplay**: Players alternate turns to move units and attack
-- **3D Grid Battlefield**: 10×10 battlefield rendered in 3D with terrain elevation and unit models
+- **Real-World Map Battlefield**: Units move directly on a live OpenStreetMap street map of NYC (Central Park / Upper West Side). The 10×10 game grid is aligned to real geographic coordinates (~1 km² area, 100 m per cell). Terrain type (Road, Forest, City, etc.) is fetched from the Overpass API and cached in localStorage.
 - **Multiple Unit Types**: Infantry, Tanks, Artillery with distinct 3D shapes and stats
 - **Health System**: Units have HP, attack, and defense values shown as floating labels
 - **Movement and Attack Ranges**: Highlighted via colored overlay planes (blue = move, red = attack, yellow = selected)
-- **Hover Highlight**: Mousing over any tile shows a white semi-transparent overlay; visible on plain tiles and brightens movement/attack/selected highlights
+- **Hover Highlight**: Mousing over any tile shows a white semi-transparent overlay
 - **City Capture & Funds**: Infantry can capture neutral/enemy cities; capturing awards $1000
 - **Counter-Attack System**: Close-range enemies (Infantry, Tank) retaliate when attacked; damage uses the same formula as a normal attack. Counter-attacks apply symmetrically — both when the player attacks AI units and when the AI attacks player units
 - **Death Animation**: Defeated units play a fall-and-fade animation (collapse, tilt, sink) with rising white smoke particles over 600ms
 - **Attack Animation**: Attacks fire an orange projectile ball that arcs from attacker to defender over 450ms, followed by a yellow impact flash on landing; counter-attacks fire a second projectile back immediately after the first lands
 - **Sound Effects**: Synthesized audio via Tone.js for all combat events — attack, impact, destroy, counter-attack, move, select, capture, victory, defeat; mute toggle in the UI
-- **MapLibre Terrain Backdrop**: A real-world MapLibre GL JS map (OpenFreeMap bright style, centered on Alsace-Lorraine) renders behind the transparent R3F canvas. The map bearing and pitch sync in real-time with the 3D camera via an imperative `MapLibreBackdropHandle` ref — no React re-renders during camera movement. The R3F canvas uses `gl={{ alpha: true }}` + `scene.background = null` for true compositing transparency.
-- **MapLibre Minimap**: A 144×144px MapLibre map overlaid in the bottom-right corner of the board shows terrain tiles and live unit positions (red/blue dots). Uses a minimal offline style with no external tile server.
+- **MapLibre Terrain Backdrop**: A real OpenStreetMap raster map renders behind the transparent R3F canvas. There are no terrain tile meshes — units and decorations (trees, buildings, mountain peaks) sit directly on the map surface. The map bearing and pitch sync in real-time with the 3D camera via an imperative `MapLibreBackdropHandle` ref. The R3F canvas uses `gl={{ alpha: true, premultipliedAlpha: false }}` + a `SceneClear` component (via `useThree`) to ensure true WebGL compositing transparency. `MapLibreBackdrop` uses a `ResizeObserver` to defer map initialization until the container has non-zero CSS dimensions.
+- **MapLibre Minimap**: A 144×144px MapLibre map overlaid in the bottom-right corner shows terrain tiles and live unit positions (red/blue dots). Uses a minimal offline style with no external tile server.
 
 ### AI Features
 
@@ -151,12 +151,13 @@ The 3D board is in `src/components/GameBoard3D.tsx`. It receives pure data props
 
 ```
 Game.tsx (state, logic)
-├── MapLibreBackdrop.tsx (absolute z:0 — real-world map behind the canvas)
-├── GameBoard3D.tsx (relative z:1 — transparent Canvas + OrbitControls)
+├── MapLibreBackdrop.tsx (absolute z:0 — OSM raster map; ResizeObserver init; setCamera() handle)
+├── GameBoard3D.tsx (absolute z:1 — transparent Canvas + OrbitControls)
+│   └── SceneClear (useThree — sets gl.setClearColor(0,0,0,0) + scene.background=null)
 │   └── GridScene (ambientLight, directionalLight, OrbitControls)
 │       ├── useFrame → computes bearing/pitch → calls mapBackdropRef.setCamera()
-│       ├── Tile3D × 100 (one per grid cell)
-│       │   ├── Terrain mesh (box with terrain-appropriate height/color)
+│       ├── Tile3D × 100 (one per grid cell — NO terrain mesh, units sit on the real map)
+│       │   ├── Invisible hitbox plane (single raycast target, prevents hover flicker)
 │       │   ├── Terrain decoration (mountain peak / forest tree / city buildings)
 │       │   ├── Highlight overlay (blue/red/yellow transparent plane)
 │       │   ├── Hover overlay (white transparent plane on pointer-over)
@@ -171,13 +172,15 @@ Game.tsx (state, logic)
 
 ### Terrain Visual Config
 
-| Terrain | Color | Height | Decoration |
-|---------|-------|--------|------------|
-| Plain | `#86efac` | 0.12 | — |
-| Road | `#d97706` | 0.06 | — |
-| Forest | `#15803d` | 0.18 | Trunk + cone crown |
-| Mountain | `#6b7280` | 0.55 | 4-sided peak cone |
-| City | `#fde68a` | 0.15 | Two box buildings (tinted by owner) |
+There are **no terrain tile meshes** — the real OSM map provides the visual ground. Terrain type is used only for movement costs (game logic) and decoration placement.
+
+| Terrain | OSM Source | Decoration |
+|---------|-----------|------------|
+| Plain | Residential / uncategorised | — |
+| Road | `highway` tags (motorway→living_street) | — |
+| Forest | `natural=wood/grass`, `leisure=park/garden` | Trunk + cone crown |
+| Mountain | `natural=water/wetland`, `waterway` (mapped as high-cost impassable) | 4-sided peak cone |
+| City | `landuse=commercial/retail/industrial` | Two box buildings (tinted by owner) |
 
 ### Unit 3D Models
 
@@ -206,9 +209,13 @@ Updates are throttled to fire only when either value changes by >0.4°. Changes 
 
 ### Canvas Transparency
 
-The R3F `Canvas` uses `gl={{ alpha: true }}` and `onCreated={({ gl, scene }) => { gl.setClearColor(0x000000, 0); scene.background = null; }}`. Both `gl.setClearColor` (clears the WebGL buffer to transparent) and `scene.background = null` (prevents Three.js from painting over the clear) are required for compositing over the MapLibre backdrop.
+The R3F `Canvas` uses `gl={{ alpha: true, premultipliedAlpha: false }}`. A `SceneClear` component inside the Canvas calls `gl.setClearColor(0x000000, 0)` and `scene.background = null` via `useThree` + `useEffect` — this is more reliable than `onCreated` because it runs inside the React commit cycle and isn't reset by R3F internals.
 
-The board container in `Game.tsx` uses CSS stacking: `MapLibreBackdrop` at `position: absolute; z-index: 0`, `GameBoard3D` wrapper at `position: relative; z-index: 1`.
+The board container in `Game.tsx` uses CSS stacking: `MapLibreBackdrop` at `position: absolute; inset: 0; z-index: 0`, `GameBoard3D` wrapper at `position: absolute; inset: 0; z-index: 1`. Both use `position: absolute; inset: 0` so they overlay exactly.
+
+### MapLibreBackdrop Initialization
+
+`MapLibreBackdrop` uses a `ResizeObserver` to defer `new maplibregl.Map(...)` until the container has non-zero `clientWidth`/`clientHeight`. This is required because the container is sized by CSS (`absolute inset-0`) and may have zero dimensions when React's `useEffect` first fires (before flex layout resolves). The style includes an explicit `background` layer (`#d4e9c8`) so the canvas is never transparent while tiles are loading.
 
 ### Click Handling & Hover Hitbox
 
@@ -241,14 +248,15 @@ src/
 │   ├── Game.tsx              # Main game component (state, logic, UI panels)
 │   └── Lobby.tsx             # Pre-game lobby and settings
 ├── components/
-│   ├── GameBoard3D.tsx       # 3D canvas: tiles, units, highlights (r3f)
-│   ├── MapLibreBackdrop.tsx  # MapLibre real-world map behind the 3D canvas; exposes setCamera() handle
+│   ├── GameBoard3D.tsx       # Transparent 3D canvas: units, decorations, highlights (r3f)
+│   ├── MapLibreBackdrop.tsx  # OSM raster map behind the 3D canvas; ResizeObserver init; setCamera() handle
 │   └── MinimapOverlay.tsx    # MapLibre minimap (terrain polygons + unit dots), bottom-right overlay
 ├── lib/
 │   ├── ai.ts                 # AI decision logic (computeAIAction)
 │   ├── combat.ts             # Damage calculation, win condition checks
 │   ├── constants.ts          # Game constants, unit stats, terrain definitions
 │   ├── grid.ts               # Grid generation, movement/attack range, terrain helpers
+│   ├── realMap.ts            # Overpass API fetch → TerrainType[][] grid; localStorage cache; multi-endpoint fallback
 │   ├── sounds.ts             # Tone.js synthesized sound effects (8 events)
 │   └── units.ts              # Unit factory (createUnit)
 └── types/
@@ -362,5 +370,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.8.0
+Version: 1.9.0
 Last Updated: April 2026

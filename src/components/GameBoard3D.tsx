@@ -1,18 +1,12 @@
 import { useRef, useState, useEffect } from 'react';
-import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Tile, Unit, TerrainType, City } from '../types/game';
+import type { MapLibreBackdropHandle } from './MapLibreBackdrop';
 
 // ── Terrain visual config ──────────────────────────────────────────────────
 
-const TERRAIN_COLOR: Record<TerrainType, string> = {
-  Plain: '#86efac',
-  Road: '#d97706',
-  Forest: '#15803d',
-  Mountain: '#6b7280',
-  City: '#fde68a',
-};
 
 const TERRAIN_HEIGHT: Record<TerrainType, number> = {
   Plain: 0.12,
@@ -56,8 +50,8 @@ interface TileProps {
 function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCooldown, cooldownSecs, onClick, onPointerOver, onPointerOut }: TileProps) {
   const [gx, gy] = tile.position;
   const terrainType = tile.terrain.type;
-  const h = TERRAIN_HEIGHT[terrainType];
-  const color = TERRAIN_COLOR[terrainType];
+  // vh = visual height offset used for stacking decorations/highlights above ground
+  const vh = 0.03;
   const unit = tile.unit;
 
   // Highlight ring color priority: selected > movement > attack
@@ -78,7 +72,7 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCoo
 
       {/* Invisible hitbox — single ray target for click/hover, prevents flicker from child mesh transitions */}
       <mesh
-        position={[0, h + 0.06, 0]}
+        position={[0, vh + 0.06, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         onClick={onClick}
         onPointerOver={onPointerOver}
@@ -88,15 +82,9 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCoo
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* Base tile */}
-      <mesh position={[0, h / 2, 0]} receiveShadow>
-        <boxGeometry args={[0.96, h, 0.96]} />
-        <meshLambertMaterial color={color} />
-      </mesh>
-
       {/* Mountain peak */}
       {terrainType === 'Mountain' && (
-        <mesh position={[0, h + 0.22, 0]}>
+        <mesh position={[0, vh + 0.22, 0]}>
           <coneGeometry args={[0.28, 0.44, 4]} />
           <meshLambertMaterial color="#9ca3af" />
         </mesh>
@@ -105,11 +93,11 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCoo
       {/* Forest tree trunk + crown */}
       {terrainType === 'Forest' && (
         <>
-          <mesh position={[0, h + 0.08, 0]}>
+          <mesh position={[0, vh + 0.08, 0]}>
             <cylinderGeometry args={[0.05, 0.05, 0.16, 6]} />
             <meshLambertMaterial color="#92400e" />
           </mesh>
-          <mesh position={[0, h + 0.28, 0]}>
+          <mesh position={[0, vh + 0.28, 0]}>
             <coneGeometry args={[0.22, 0.36, 6]} />
             <meshLambertMaterial color="#166534" />
           </mesh>
@@ -119,17 +107,17 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCoo
       {/* City buildings */}
       {isCity && (
         <>
-          <mesh position={[0.16, h + 0.16, 0.16]}>
+          <mesh position={[0.16, vh + 0.16, 0.16]}>
             <boxGeometry args={[0.24, 0.32, 0.24]} />
             <meshLambertMaterial color={CITY_OWNER_COLOR[cityOwnerKey]} />
           </mesh>
-          <mesh position={[-0.14, h + 0.22, -0.14]}>
+          <mesh position={[-0.14, vh + 0.22, -0.14]}>
             <boxGeometry args={[0.2, 0.44, 0.2]} />
             <meshLambertMaterial color={CITY_OWNER_COLOR[cityOwnerKey]} />
           </mesh>
           {/* Capture progress bar */}
           {city && city.captureProgress > 0 && (
-            <mesh position={[0, h + 0.01, 0.42]}>
+            <mesh position={[0, vh + 0.01, 0.42]}>
               <boxGeometry args={[(city.captureProgress / 20) * 0.9, 0.04, 0.06]} />
               <meshLambertMaterial color="#eab308" />
             </mesh>
@@ -139,15 +127,15 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCoo
 
       {/* Highlight overlay */}
       {highlightColor && (
-        <mesh position={[0, h + 0.015, 0]}>
+        <mesh position={[0, vh + 0.015, 0]}>
           <boxGeometry args={[0.96, 0.03, 0.96]} />
-          <meshLambertMaterial color={highlightColor} transparent opacity={0.55} />
+          <meshLambertMaterial color={highlightColor} transparent opacity={0.65} />
         </mesh>
       )}
 
       {/* Hover overlay */}
       {isHovered && (
-        <mesh position={[0, h + 0.03, 0]}>
+        <mesh position={[0, vh + 0.03, 0]}>
           <boxGeometry args={[0.96, 0.03, 0.96]} />
           <meshLambertMaterial color="#ffffff" transparent opacity={0.28} />
         </mesh>
@@ -155,7 +143,7 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCoo
 
       {/* Unit mesh */}
       {unit && (
-        <group position={[0, h, 0]}>
+        <group position={[0, vh, 0]}>
           {unit.type === 'Infantry' && (
             <group>
               {/* Left leg */}
@@ -518,6 +506,19 @@ function ImpactFlash({ defenderPos, h, startTime, delay }: {
   );
 }
 
+// ── Canvas transparency helper ────────────────────────────────────────────
+// Runs inside the Canvas context so it has access to the live WebGLRenderer.
+// Using useThree + useEffect is more reliable than the outer onCreated prop
+// because it runs after the first commit and isn't reset by R3F internals.
+function SceneClear() {
+  const { gl, scene } = useThree();
+  useEffect(() => {
+    gl.setClearColor(0x000000, 0);
+    scene.background = null;
+  }, [gl, scene]);
+  return null;
+}
+
 // ── Grid scene (inside Canvas) ─────────────────────────────────────────────
 
 interface GridSceneProps {
@@ -529,12 +530,37 @@ interface GridSceneProps {
   now: number;
   onTileClick: (x: number, y: number, screenX: number, screenY: number) => void;
   attackEvent: { attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number; hasCounter: boolean } | null;
+  mapBackdropRef?: React.RefObject<MapLibreBackdropHandle | null>;
 }
 
-function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldowns, now, onTileClick, attackEvent }: GridSceneProps) {
+const ORBIT_TARGET = new THREE.Vector3(4.5, 0, 4.5);
+
+function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldowns, now, onTileClick, attackEvent, mapBackdropRef }: GridSceneProps) {
   const moveSet = new Set(movementRange.map(([x, y]) => `${x},${y}`));
   const attackSet = new Set(attackRange.map(([x, y]) => `${x},${y}`));
   const [hoveredTile, setHoveredTile] = useState<string | null>(null);
+
+  // ── MapLibre camera sync ──────────────────────────────────────────────────
+  const lastBearingRef = useRef<number | null>(null);
+  const lastPitchRef   = useRef<number | null>(null);
+
+  useFrame(({ camera }) => {
+    if (!mapBackdropRef?.current) return;
+    const dx = camera.position.x - ORBIT_TARGET.x;
+    const dy = camera.position.y - ORBIT_TARGET.y;
+    const dz = camera.position.z - ORBIT_TARGET.z;
+    const bearing = Math.atan2(dx, -dz) * (180 / Math.PI);
+    const horiz   = Math.sqrt(dx * dx + dz * dz);
+    const elev    = Math.atan2(dy, horiz) * (180 / Math.PI);
+    const pitch   = Math.max(0, Math.min(60, 90 - elev));
+    if (lastBearingRef.current === null ||
+        Math.abs(bearing - lastBearingRef.current) > 0.4 ||
+        Math.abs(pitch  - lastPitchRef.current!)  > 0.4) {
+      lastBearingRef.current = bearing;
+      lastPitchRef.current   = pitch;
+      mapBackdropRef.current.setCamera(bearing, pitch);
+    }
+  });
 
   const isUnitOnCooldown = (id: string) => {
     const cd = unitCooldowns[id];
@@ -574,7 +600,7 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
       for (const tile of row)
         if (tile.unit) {
           const [gx, gy] = tile.position;
-          snapshot.set(tile.unit.id, { unit: tile.unit, gx, gy, h: TERRAIN_HEIGHT[tile.terrain.type] });
+          snapshot.set(tile.unit.id, { unit: tile.unit, gx, gy, h: 0.03 });
         }
     prevUnitsRef.current = snapshot;
   }, [grid]);
@@ -708,6 +734,8 @@ export interface GameBoard3DProps {
   now: number;
   onTileClick: (x: number, y: number, screenX: number, screenY: number) => void;
   attackEvent: { attackerPos: [number, number]; defenderPos: [number, number]; timestamp: number; hasCounter: boolean } | null;
+  /** Optional ref to the MapLibreBackdrop — enables bearing/pitch camera sync. */
+  mapBackdropRef?: React.RefObject<MapLibreBackdropHandle | null>;
 }
 
 export default function GameBoard3D(props: GameBoard3DProps) {
@@ -716,12 +744,16 @@ export default function GameBoard3D(props: GameBoard3DProps) {
   if (!props.grid.length) return null;
 
   return (
-    <div ref={canvasRef} style={{ width: '100%', height: '100%', minHeight: 420, borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 16px rgba(0,0,0,0.25)' }}>
+    // position: absolute + inset: 0 overlays the canvas exactly over the
+    // MapLibreBackdrop (also absolute inset-0). z-index: 1 keeps it on top.
+    <div ref={canvasRef} style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
       <Canvas
         camera={{ position: [4.5, 13, 16], fov: 42 }}
         shadows
-        gl={{ antialias: true }}
+        gl={{ antialias: true, alpha: true, premultipliedAlpha: false }}
+        style={{ background: 'transparent' }}
       >
+        <SceneClear />
         <GridScene {...props} />
       </Canvas>
     </div>

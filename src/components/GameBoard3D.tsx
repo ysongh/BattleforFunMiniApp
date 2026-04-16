@@ -541,24 +541,38 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
   const [hoveredTile, setHoveredTile] = useState<string | null>(null);
 
   // ── MapLibre camera sync ──────────────────────────────────────────────────
+  // Reference distance: initial camera [4.5,13,16] → target [4.5,0,4.5]
+  // dist = sqrt(0² + 13² + 11.5²) ≈ 17.36 units → MAP_ZOOM 15
+  const BASE_DIST = Math.sqrt(13 * 13 + 11.5 * 11.5); // ≈ 17.36
+  const BASE_ZOOM = 15;
+
   const lastBearingRef = useRef<number | null>(null);
   const lastPitchRef   = useRef<number | null>(null);
+  const lastZoomRef    = useRef<number | null>(null);
 
   useFrame(({ camera }) => {
     if (!mapBackdropRef?.current) return;
     const dx = camera.position.x - ORBIT_TARGET.x;
     const dy = camera.position.y - ORBIT_TARGET.y;
     const dz = camera.position.z - ORBIT_TARGET.z;
+
     const bearing = Math.atan2(dx, -dz) * (180 / Math.PI);
     const horiz   = Math.sqrt(dx * dx + dz * dz);
     const elev    = Math.atan2(dy, horiz) * (180 / Math.PI);
     const pitch   = Math.max(0, Math.min(60, 90 - elev));
+
+    // Zoom: each time camera distance doubles, MapLibre zoom drops by 1.
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const zoom  = Math.max(10, Math.min(20, BASE_ZOOM - Math.log2(dist / BASE_DIST)));
+
     if (lastBearingRef.current === null ||
         Math.abs(bearing - lastBearingRef.current) > 0.4 ||
-        Math.abs(pitch  - lastPitchRef.current!)  > 0.4) {
+        Math.abs(pitch   - lastPitchRef.current!)  > 0.4 ||
+        Math.abs(zoom    - lastZoomRef.current!)    > 0.05) {
       lastBearingRef.current = bearing;
       lastPitchRef.current   = pitch;
-      mapBackdropRef.current.setCamera(bearing, pitch);
+      lastZoomRef.current    = zoom;
+      mapBackdropRef.current.setCamera(bearing, pitch, zoom);
     }
   });
 

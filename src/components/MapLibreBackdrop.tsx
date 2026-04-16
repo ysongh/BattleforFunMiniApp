@@ -5,7 +5,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 // ── Public handle ─────────────────────────────────────────────────────────
 
 export interface MapLibreBackdropHandle {
-  setCamera: (bearing: number, pitch: number) => void;
+  setCamera: (bearing: number, pitch: number, zoom: number) => void;
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -46,8 +46,8 @@ const MapLibreBackdrop = forwardRef<MapLibreBackdropHandle, MapLibreBackdropProp
     const mapRef       = useRef<maplibregl.Map | null>(null);
 
     useImperativeHandle(ref, () => ({
-      setCamera(bearing: number, pitch: number) {
-        mapRef.current?.jumpTo({ bearing, pitch });
+      setCamera(bearing: number, pitch: number, zoom: number) {
+        mapRef.current?.jumpTo({ bearing, pitch, zoom });
       },
     }));
 

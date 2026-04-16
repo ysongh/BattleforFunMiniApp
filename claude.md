@@ -205,7 +205,15 @@ bearing = atan2(dx, -dz) * (180 / π)           // clockwise from –Z (north)
 pitch   = clamp(90 − atan2(dy, horiz) * (180/π), 0, 60)  // MapLibre: 0=top-down, 60=horizon
 ```
 
-Updates are throttled to fire only when either value changes by >0.4°. Changes are pushed imperatively via `mapBackdropRef.current.setCamera(bearing, pitch)` — no React state update, no re-render. `MapLibreBackdrop` calls `map.jumpTo({ bearing, pitch })` for instant (zero-lag) sync.
+Updates are throttled to fire only when bearing changes >0.4°, pitch changes >0.4°, or zoom changes >0.05. Changes are pushed imperatively via `mapBackdropRef.current.setCamera(bearing, pitch, zoom)` — no React state update, no re-render. `MapLibreBackdrop` calls `map.jumpTo({ bearing, pitch, zoom })` for instant (zero-lag) sync.
+
+Zoom is derived from camera distance to the orbit target:
+```typescript
+const BASE_DIST = Math.sqrt(13² + 11.5²)  // ≈ 17.36 — initial camera distance
+const BASE_ZOOM = 15                        // MapLibre zoom at that distance
+zoom = clamp(BASE_ZOOM - log2(dist / BASE_DIST), 10, 20)
+// doubling camera distance → zoom −1; halving → zoom +1
+```
 
 ### Canvas Transparency
 
@@ -370,5 +378,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.9.0
+Version: 1.10.0
 Last Updated: April 2026

@@ -79,6 +79,7 @@ interface Unit {
 - **Range Limit**: Units cannot move beyond their `moveRange`
 - **Collision Detection**: Units cannot move onto occupied tiles
 - **Grid Boundaries**: Movement is restricted to the 10×10 grid
+- **Terrain Movement Costs**: Road 0.5, Plain/City 1, Forest 2, Mountain 3, Water 4 — Water is traversable but expensive, so only fast units (Tank `moveRange: 5`) can cross a single tile. Units never spawn on Water or Mountain tiles (`findPassableTile` in `Game.tsx`).
 
 ### Combat System
 
@@ -180,8 +181,9 @@ There are **no terrain tile meshes** — the real OSM map provides the visual gr
 | Plain | Residential / uncategorised | — |
 | Road | `highway` tags (motorway→living_street) | — |
 | Forest | `natural=wood/grass`, `leisure=park/garden` | Trunk + cone crown |
-| Mountain | `natural=water/wetland`, `waterway` (mapped as high-cost impassable) | 4-sided peak cone |
+| Mountain | (random-gen only) | 4-sided peak cone |
 | City | `landuse=commercial/retail/industrial` | Two box buildings (tinted by owner) |
+| Water | `natural=water/wetland`, `waterway` | Semi-transparent flat blue plane |
 
 ### Unit 3D Models
 
@@ -419,5 +421,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.11.0
+Version: 1.12.0
 Last Updated: April 2026

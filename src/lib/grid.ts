@@ -8,6 +8,7 @@ export const getTerrainColor = (terrain: TerrainType): string => {
     case 'Forest': return 'bg-green-600';
     case 'City': return 'bg-yellow-200';
     case 'Road': return 'bg-yellow-600';
+    case 'Water': return 'bg-blue-500';
     default: return 'bg-green-200';
   }
 };

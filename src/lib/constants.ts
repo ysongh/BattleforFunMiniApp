@@ -50,4 +50,5 @@ export const TERRAIN_TYPES: Record<TerrainType, Terrain> = {
     isCity: true,
   },
   Road: { type: 'Road', defenseBonus: 0, movementCost: 0.5 },
+  Water: { type: 'Water', defenseBonus: 0, movementCost: 4 },
 };

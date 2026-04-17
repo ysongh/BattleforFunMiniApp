@@ -5,7 +5,7 @@
  * converts it into a TerrainType[][] grid that generateInitialGrid() can consume.
  *
  * Each grid cell is 100 × 100 m by default.  The classification priority is:
- *   water  →  Mountain  (high movement cost / impassable rivers/lakes)
+ *   water  →  Water     (very high movement cost — rivers/lakes/ocean)
  *   road   →  Road      (cheap movement — streets, avenues)
  *   park   →  Forest    (moderate cost — parks, woods, grass)
  *   city   →  City      (moderate cost — commercial/retail zones)
@@ -70,7 +70,7 @@ function classifyTags(tags: Record<string, string>): FeatureClass | null {
 
 function toTerrainType(cls: FeatureClass): TerrainType {
   switch (cls) {
-    case 'water': return 'Mountain';   // high cost — rivers/lakes
+    case 'water': return 'Water';
     case 'road':  return 'Road';
     case 'park':  return 'Forest';
     case 'city':  return 'City';

@@ -14,6 +14,7 @@ const TERRAIN_HEIGHT: Record<TerrainType, number> = {
   Forest: 0.18,
   Mountain: 0.55,
   City: 0.15,
+  Water: 0.04,
 };
 
 const UNIT_BASE_COLOR: Record<string, string> = {
@@ -81,6 +82,14 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCoo
         <planeGeometry args={[0.96, 0.96]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
+
+      {/* Water surface */}
+      {terrainType === 'Water' && (
+        <mesh position={[0, vh + 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.96, 0.96]} />
+          <meshLambertMaterial color="#3b82f6" transparent opacity={0.7} />
+        </mesh>
+      )}
 
       {/* Mountain peak */}
       {terrainType === 'Mountain' && (

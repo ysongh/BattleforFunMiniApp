@@ -23,6 +23,7 @@ const TERRAIN_FILL: Record<TerrainType, string> = {
   Forest:   '#15803d',
   Mountain: '#6b7280',
   City:     '#fde68a',
+  Water:    '#3b82f6',
 };
 
 // ── GeoJSON builders ──────────────────────────────────────────────────────

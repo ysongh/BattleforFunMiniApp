@@ -214,7 +214,8 @@ const Game = () => {
           if (Math.abs(dx) + Math.abs(dy) !== r) continue; // ring only
           const nx = prefX + dx, ny = prefY + dy;
           if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
-          if (grid[ny][nx].terrain.type !== 'Mountain' && !grid[ny][nx].unit) {
+          const t = grid[ny][nx].terrain.type;
+          if (t !== 'Mountain' && t !== 'Water' && !grid[ny][nx].unit) {
             return [nx, ny];
           }
         }

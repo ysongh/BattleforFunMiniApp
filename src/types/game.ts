@@ -1,5 +1,5 @@
 export type UnitType = 'Infantry' | 'Tank' | 'Artillery';
-export type TerrainType = 'Plain' | 'Mountain' | 'Forest' | 'City' | 'Road';
+export type TerrainType = 'Plain' | 'Mountain' | 'Forest' | 'City' | 'Road' | 'Water';
 export type Player = 'Red' | 'Blue';
 
 export interface Terrain {

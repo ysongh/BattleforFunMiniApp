@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import LocationPicker from '../components/LocationPicker';
 
 // Types
 interface Player {
@@ -11,80 +12,34 @@ interface Player {
   aiDifficulty?: 'easy' | 'medium' | 'hard';
 }
 
-interface MapTemplate {
-  id: string;
-  name: string;
-  size: string;
-  terrain: string;
-  description: string;
-  thumbnail: string;
-}
-
 interface GameSettings {
   startingFunds: number;
   fogOfWar: boolean;
   turnTimeLimit: number; // In seconds, 0 means no limit
-  mapId: string;
 }
 
 const Lobby = ({ }) => {
   const navigate = useNavigate();
 
-  // Sample map templates
-  const mapTemplates: MapTemplate[] = [
-    {
-      id: "map1",
-      name: "Green Plains",
-      size: "10×10",
-      terrain: "Balanced",
-      description: "A beginner-friendly map with open plains and minimal obstacles.",
-      thumbnail: "/api/placeholder/120/80"
-    },
-    {
-      id: "map2",
-      name: "Mountain Pass",
-      size: "12×12",
-      terrain: "Mountainous",
-      description: "Mountains divide the map, creating choke points for strategic battles.",
-      thumbnail: "/api/placeholder/120/80"
-    },
-    {
-      id: "map3",
-      name: "Archipelago",
-      size: "15×15",
-      terrain: "Islands",
-      description: "Several islands connected by bridges. Naval units excel here.",
-      thumbnail: "/api/placeholder/120/80"
-    },
-    {
-      id: "map4",
-      name: "Urban Warfare",
-      size: "10×10",
-      terrain: "City",
-      description: "City blocks provide cover and strategic capture points.",
-      thumbnail: "/api/placeholder/120/80"
-    }
-  ];
-
   // Game state
   const [players, setPlayers] = useState<Player[]>([
     { id: "p1", name: "Player 1", faction: null, ready: false },
   ]);
-  
+
   const [gameSettings, setGameSettings] = useState<GameSettings>({
     startingFunds: 10000,
     fogOfWar: false,
     turnTimeLimit: 0,
-    mapId: mapTemplates[0].id
   });
-  
+
   const [chatMessages, setChatMessages] = useState<{sender: string, text: string}[]>([
-    { sender: "System", text: "Welcome to the game lobby! Select your faction and map to begin." },
+    { sender: "System", text: "Welcome to the game lobby! Pick a battle location on the map." },
   ]);
-  
+
   const [chatInput, setChatInput] = useState("");
-  const [selectedMap, setSelectedMap] = useState<string>(mapTemplates[0].id);
-  const [isHost, setIsHost] = useState(true); // First player is host by default
+  // Battle location — click the map or pick a preset. Defaults to Central Park, NYC.
+  const [battleLocation, setBattleLocation] = useState<[number, number]>([-73.9712, 40.7831]);
+  const [isHost] = useState(true); // First player is host by default
 
   // Actions
   const handleNameChange = (playerId: string, name: string) => {
@@ -105,11 +60,6 @@ const Lobby = ({ }) => {
 
   const handleReadyToggle = (playerId: string) => {
     setPlayers(players.map(p => p.id === playerId ? { ...p, ready: !p.ready } : p));
-  };
-
-  const handleMapChange = (mapId: string) => {
-    setSelectedMap(mapId);
-    setGameSettings({ ...gameSettings, mapId });
   };
 
   const handleSettingChange = (setting: keyof GameSettings, value: any) => {
@@ -170,6 +120,7 @@ const Lobby = ({ }) => {
       state: {
         isAIEnabled: hasAIPlayer,
         aiDifficulty: aiPlayer?.aiDifficulty ?? 'medium',
+        battleLocation,
       },
     });
   };
@@ -313,33 +264,14 @@ const Lobby = ({ }) => {
             </div>
           </div>
           
-          {/* Right column - Map Selection & Chat */}
+          {/* Right column - Battle Location & Chat */}
           <div className="space-y-6">
-            {/* Map Selection */}
+            {/* Battle Location */}
             <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="text-xl font-semibold mb-4">Map Selection</h2>
-              
-              <div className="grid grid-cols-2 gap-3">
-                {mapTemplates.map(map => (
-                  <div
-                    key={map.id}
-                    className={`border rounded cursor-pointer p-2 ${selectedMap === map.id ? 'ring-2 ring-blue-500' : ''}`}
-                    onClick={() => isHost && handleMapChange(map.id)}
-                  >
-                    <img src={map.thumbnail} alt={map.name} className="w-full h-20 object-cover bg-gray-200 mb-2" />
-                    <h3 className="font-medium">{map.name}</h3>
-                    <div className="text-xs text-gray-600">{map.size} • {map.terrain}</div>
-                  </div>
-                ))}
-              </div>
-              
-              {selectedMap && (
-                <div className="mt-3 text-sm text-gray-700">
-                  {mapTemplates.find(m => m.id === selectedMap)?.description}
-                </div>
-              )}
+              <h2 className="text-xl font-semibold mb-4">Battle Location</h2>
+              <LocationPicker value={battleLocation} onChange={setBattleLocation} />
             </div>
-            
+
             {/* Chat */}
             <div className="bg-white rounded-lg shadow p-4 flex flex-col h-64">
               <h2 className="text-xl font-semibold mb-2">Chat</h2>

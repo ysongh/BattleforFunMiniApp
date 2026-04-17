@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, built with React 19, TypeScript, Tailwind CSS, `@react-three/fiber` for a 3D battlefield, and MapLibre GL JS for real-world map rendering. Players command units on a 10×10 grid that is overlaid directly on a real OpenStreetMap street map (defaulting to Central Park / Upper West Side, NYC). The game includes an AI opponent with three difficulty levels.
+BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, built with React 19, TypeScript, Tailwind CSS, `@react-three/fiber` for a 3D battlefield, and MapLibre GL JS for real-world map rendering. Players command units on a 10×10 grid that is overlaid directly on a real OpenStreetMap street map. Before the match, players pick a battle location anywhere in the world from the Lobby's interactive world map (defaults to Central Park / Upper West Side, NYC). The game includes an AI opponent with three difficulty levels.
 
 ## Table of Contents
 
@@ -22,7 +22,8 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 ### Core Features
 
 - **Turn-Based Gameplay**: Players alternate turns to move units and attack
-- **Real-World Map Battlefield**: Units move directly on a live OpenStreetMap street map of NYC (Central Park / Upper West Side). The 10×10 game grid is aligned to real geographic coordinates (~1 km² area, 100 m per cell). Terrain type (Road, Forest, City, etc.) is fetched from the Overpass API and cached in localStorage.
+- **Real-World Map Battlefield**: Units move directly on a live OpenStreetMap street map at the lobby-selected location. The 10×10 game grid is aligned to real geographic coordinates (~1 km² area, 100 m per cell). Terrain type (Road, Forest, City, etc.) is fetched from the Overpass API and cached in localStorage (keyed by lat/lng).
+- **Lobby Location Picker**: Before starting, the host picks where to fight on an interactive MapLibre world map (`LocationPicker`). Click anywhere on the map or drag the red marker to choose any point on Earth; 6 preset cities (NYC, Paris, London, Tokyo, Rome, San Francisco) are available as quick picks. The chosen `[lng, lat]` is passed to `Game.tsx` via React Router navigation state (`location.state.battleLocation`).
 - **Multiple Unit Types**: Infantry, Tanks, Artillery with distinct 3D shapes and stats
 - **Health System**: Units have HP, attack, and defense values shown as floating labels
 - **Movement and Attack Ranges**: Highlighted via colored overlay planes (blue = move, red = attack, yellow = selected)
@@ -253,10 +254,11 @@ Key CSS entry points:
 ```
 src/
 ├── pages/
-│   ├── Game.tsx              # Main game component (state, logic, UI panels)
-│   └── Lobby.tsx             # Pre-game lobby and settings
+│   ├── Game.tsx              # Main game component (state, logic, UI panels); reads battleLocation from router state
+│   └── Lobby.tsx             # Pre-game lobby; players, settings, chat, and LocationPicker
 ├── components/
 │   ├── GameBoard3D.tsx       # Transparent 3D canvas: units, decorations, highlights (r3f)
+│   ├── LocationPicker.tsx    # Interactive MapLibre world map in the Lobby — click/drag marker or use presets
 │   ├── MapLibreBackdrop.tsx  # OSM raster map behind the 3D canvas; ResizeObserver init; setCamera() handle
 │   └── MinimapOverlay.tsx    # MapLibre minimap (terrain polygons + unit dots), bottom-right overlay
 ├── lib/
@@ -283,6 +285,11 @@ npm run dev
 ```
 
 ## How to Play
+
+### Lobby
+
+1. **Pick your Battle Location**: On the world map in the right column, click anywhere to drop the marker, drag the marker to refine, or use a preset city (NYC, Paris, London, Tokyo, Rome, San Francisco).
+2. Choose a faction, mark yourself Ready, optionally add AI opponents, and hit **Start Game**. The selected `[lng, lat]` is handed to `Game.tsx` via router state.
 
 ### Player Turn (Red)
 
@@ -327,11 +334,45 @@ interface GameBoard3DProps {
 
 ```typescript
 export interface MapLibreBackdropHandle {
-  setCamera: (bearing: number, pitch: number) => void;
+  setCamera: (bearing: number, pitch: number, zoom: number) => void;
 }
 ```
 
 Obtained via `useRef<MapLibreBackdropHandle | null>(null)` in `Game.tsx` and passed as `ref` to `<MapLibreBackdrop>`.
+
+### LocationPicker Props
+
+```typescript
+interface LocationPickerProps {
+  value: [number, number];                           // [lng, lat]
+  onChange: (lngLat: [number, number]) => void;
+}
+```
+
+Used by `Lobby.tsx`. Renders a full-interactive MapLibre raster map (OSM tiles) with a draggable red marker and 6 preset cities. Parent preset changes trigger `map.flyTo({ center, zoom: 13 })`; marker drags and map clicks emit `onChange`.
+
+### Lobby → Game Navigation State
+
+```typescript
+// Lobby.tsx
+navigate('/game', {
+  state: {
+    isAIEnabled,
+    aiDifficulty,
+    battleLocation,    // [lng, lat]
+  },
+});
+
+// Game.tsx
+const lobbyState = location.state as {
+  isAIEnabled?: boolean;
+  aiDifficulty?: 'easy' | 'medium' | 'hard';
+  battleLocation?: [number, number];
+} | null;
+const MAP_CENTER: [number, number] = lobbyState?.battleLocation ?? DEFAULT_MAP_CENTER;
+```
+
+`MAP_CENTER` feeds both `fetchRealTerrain(lng, lat)` for Overpass terrain lookup and `<MapLibreBackdrop center={MAP_CENTER} />`.
 
 ### Key State in Game.tsx
 
@@ -378,5 +419,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.10.0
+Version: 1.11.0
 Last Updated: April 2026

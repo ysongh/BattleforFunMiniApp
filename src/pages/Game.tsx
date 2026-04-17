@@ -13,10 +13,7 @@ import MapLibreBackdrop, { type MapLibreBackdropHandle } from '../components/Map
 import { fetchRealTerrain } from '../lib/realMap';
 import type { TerrainType } from '../types/game';
 
-// ── Real-world game location ───────────────────────────────────────────────
-// Central Park / Upper West Side, NYC — varied terrain: avenues (Road),
-// Central Park (Forest), Reservoir (Mountain/water), urban blocks (City/Plain).
-const MAP_CENTER: [number, number] = [-73.9712, 40.7831]; // [lng, lat]
+const DEFAULT_MAP_CENTER: [number, number] = [-73.9712, 40.7831];
 const MAP_ZOOM = 15;
 import { playAttack, playCounterAttack, playImpact, playDestroyed, playSelect, playMove, playCaptured, playVictory, playDefeat } from '../lib/sounds';
 import {
@@ -41,7 +38,12 @@ const getUnitIcon = (type: UnitType) => {
 
 const Game = () => {
   const location = useLocation();
-  const lobbyState = location.state as { isAIEnabled?: boolean; aiDifficulty?: 'easy' | 'medium' | 'hard' } | null;
+  const lobbyState = location.state as {
+    isAIEnabled?: boolean;
+    aiDifficulty?: 'easy' | 'medium' | 'hard';
+    battleLocation?: [number, number];
+  } | null;
+  const MAP_CENTER: [number, number] = lobbyState?.battleLocation ?? DEFAULT_MAP_CENTER;
 
   const [grid, setGrid] = useState<Tile[][]>([]);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);

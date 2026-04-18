@@ -22,7 +22,7 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 ### Core Features
 
 - **Turn-Based Gameplay**: Players alternate turns to move units and attack
-- **Real-World Map Battlefield**: Units move directly on a live OpenStreetMap street map at the lobby-selected location. The 10×10 game grid is aligned to real geographic coordinates (~1 km² area, 100 m per cell). Terrain type (Road, Forest, City, etc.) is fetched from the Overpass API and cached in localStorage (keyed by lat/lng).
+- **Real-World Map Battlefield**: Units move directly on a live OpenStreetMap street map at the lobby-selected location. The 10×10 game grid is aligned to real geographic coordinates (~150 m × 150 m area, 15 m per cell) so unit footprints roughly match real street/road width. Terrain type (Road, Forest, City, etc.) is fetched from the Overpass API and cached in localStorage (keyed by lat/lng/cellMeters).
 - **Lobby Location Picker**: Before starting, the host picks where to fight on an interactive MapLibre world map (`LocationPicker`). Click anywhere on the map or drag the red marker to choose any point on Earth; 6 preset cities (NYC, Paris, London, Tokyo, Rome, San Francisco) are available as quick picks. The chosen `[lng, lat]` is passed to `Game.tsx` via React Router navigation state (`location.state.battleLocation`).
 - **Multiple Unit Types**: Infantry, Tanks, Artillery with distinct 3D shapes and stats
 - **Health System**: Units have HP, attack, and defense values shown as floating labels
@@ -218,7 +218,7 @@ Updates are throttled to fire only when bearing changes >0.4°, pitch changes >0
 Zoom is derived from camera distance to the orbit target:
 ```typescript
 const BASE_DIST = Math.sqrt(13² + 11.5²)  // ≈ 17.36 — initial camera distance
-const BASE_ZOOM = 15                        // MapLibre zoom at that distance
+const BASE_ZOOM = 18                        // MapLibre zoom at that distance
 zoom = clamp(BASE_ZOOM - log2(dist / BASE_DIST), 10, 20)
 // doubling camera distance → zoom −1; halving → zoom +1
 ```
@@ -426,5 +426,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.13.0
+Version: 1.14.0
 Last Updated: April 2026

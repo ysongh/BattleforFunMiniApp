@@ -14,7 +14,7 @@ import { fetchRealTerrain } from '../lib/realMap';
 import type { TerrainType } from '../types/game';
 
 const DEFAULT_MAP_CENTER: [number, number] = [-73.9712, 40.7831];
-const MAP_ZOOM = 15;
+const MAP_ZOOM = 18;
 import { playAttack, playCounterAttack, playImpact, playDestroyed, playSelect, playMove, playCaptured, playVictory, playDefeat } from '../lib/sounds';
 import {
   IconSword,

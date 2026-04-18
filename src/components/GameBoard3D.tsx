@@ -551,9 +551,9 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
 
   // ── MapLibre camera sync ──────────────────────────────────────────────────
   // Reference distance: initial camera [4.5,13,16] → target [4.5,0,4.5]
-  // dist = sqrt(0² + 13² + 11.5²) ≈ 17.36 units → MAP_ZOOM 15
+  // dist = sqrt(0² + 13² + 11.5²) ≈ 17.36 units → MAP_ZOOM 18
   const BASE_DIST = Math.sqrt(13 * 13 + 11.5 * 11.5); // ≈ 17.36
-  const BASE_ZOOM = 15;
+  const BASE_ZOOM = 18;
 
   const lastBearingRef = useRef<number | null>(null);
   const lastPitchRef   = useRef<number | null>(null);

@@ -146,9 +146,9 @@ const OVERPASS_ENDPOINTS = [
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ];
 
-/** Cache key based on location, so real terrain is only fetched once per location. */
-function cacheKey(lng: number, lat: number) {
-  return `realmap_${lng.toFixed(4)}_${lat.toFixed(4)}`;
+/** Cache key based on location + cell size — different cell sizes get separate caches. */
+function cacheKey(lng: number, lat: number, cellMeters: number) {
+  return `realmap_${lng.toFixed(4)}_${lat.toFixed(4)}_${cellMeters}`;
 }
 
 async function fetchFromAnyEndpoint(query: string): Promise<{ elements: OsmElement[] }> {
@@ -179,10 +179,10 @@ export async function fetchRealTerrain(
   centerLng: number,
   centerLat: number,
   gridSize = GRID_SIZE,
-  cellMeters = 100,
+  cellMeters = 15,
 ): Promise<TerrainType[][] | null> {
   // ── Check cache first ────────────────────────────────────────────────────
-  const key = cacheKey(centerLng, centerLat);
+  const key = cacheKey(centerLng, centerLat, cellMeters);
   try {
     const cached = localStorage.getItem(key);
     if (cached) {
@@ -222,9 +222,9 @@ export async function fetchRealTerrain(
       features.push({ cls, geom: el.geometry, closed: isClosed(el.geometry) });
     }
 
-    // Road threshold: 20 m — a road must pass within 20 m of a cell centre.
-    // At NYC's ~80 m street spacing, this creates clear road corridors.
-    const roadThresh = 20 / METERS_PER_DEG_LAT;
+    // Road threshold scales with cell size — a road must pass within half a
+    // cell width of the cell centre so neighbouring cells aren't double-counted.
+    const roadThresh = (cellMeters / 2) / METERS_PER_DEG_LAT;
 
     const terrain: TerrainType[][] = [];
     for (let y = 0; y < gridSize; y++) {
@@ -263,7 +263,7 @@ export function gridCellToLngLat(
   centerLng: number,
   centerLat: number,
   gridSize = GRID_SIZE,
-  cellMeters = 100,
+  cellMeters = 15,
 ): [number, number] {
   const cellLat = cellMeters / METERS_PER_DEG_LAT;
   const cellLng = cellMeters / metersPerDegLng(centerLat);

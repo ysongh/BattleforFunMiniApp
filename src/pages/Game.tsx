@@ -91,11 +91,13 @@ const Game = () => {
   const cooldownsRef = useRef(unitCooldowns);
   const aiDifficultyRef = useRef(aiDifficulty);
   const gameOverRef = useRef(false);
+  const resourcesRef = useRef(resources);
 
   useEffect(() => { gridRef.current = grid; }, [grid]);
   useEffect(() => { apRef.current = actionPoints; }, [actionPoints]);
   useEffect(() => { cooldownsRef.current = unitCooldowns; }, [unitCooldowns]);
   useEffect(() => { aiDifficultyRef.current = aiDifficulty; }, [aiDifficulty]);
+  useEffect(() => { resourcesRef.current = resources; }, [resources]);
 
   // Update clock every second for cooldown display
   useEffect(() => {
@@ -139,12 +141,20 @@ const Game = () => {
       actionPoints: apRef.current.Blue,
       cooldowns: cooldownsRef.current,
       difficulty: aiDifficultyRef.current,
+      funds: resourcesRef.current.Blue,
     });
 
     if (!action) return;
 
     setActionPoints(prev => ({ ...prev, Blue: prev.Blue - 1 }));
     setUnitCooldowns(prev => ({ ...prev, [action.unit.id]: Date.now() + COOLDOWN_DURATION }));
+
+    if (action.type === 'produce') {
+      setGrid(action.newGrid);
+      setResources(prev => ({ ...prev, Blue: prev.Blue - action.cost }));
+      setGameStatus(`AI produced ${action.unitType} for $${action.cost}`);
+      return;
+    }
 
     if (action.type === 'attack') {
       const defenderAfter = action.newGrid[action.targetY][action.targetX].unit;

@@ -42,6 +42,7 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 - **Three Difficulty Levels**: Easy (random), Medium (prioritizes attacks), Hard (targets weakest enemies)
 - **Automated Turn Execution**: AI acts every 3 seconds via interval
 - **Intelligent Targeting**: AI prioritizes weak enemies and optimal positioning
+- **Unit Production**: The AI spends its funds to produce new units from Blue-owned empty cities; prefers Tank when outnumbered, Artillery otherwise (Easy difficulty prefers Infantry)
 
 ## Technical Stack
 
@@ -125,25 +126,29 @@ AI logic lives in `src/lib/ai.ts` as a pure function `computeAIAction()` that re
 
 ```
 Game.tsx: tryAIAction() (useCallback)
-└── ai.ts: computeAIAction(context)
+└── ai.ts: computeAIAction({ grid, actionPoints, cooldowns, difficulty, funds })
+    ├── Produce a unit at a Blue-owned empty city (if funds allow)
     ├── Find available Blue units (not on cooldown, have AP)
     ├── Pick unit (difficulty-based selection)
     ├── Try attack first (difficulty-based targeting)
     └── Fall back to move toward nearest enemy
-    └── Returns { type, unit, newGrid } or null
+    └── Returns { type: 'produce' | 'attack' | 'move', unit, newGrid, ... } or null
 
 tryAIAction then applies counter-attack damage on top of newGrid before
 calling setGrid — so Red units retaliate against AI attacks just as they
-do against player attacks.
+do against player attacks. On 'produce' actions it also deducts the unit
+cost from resources.Blue.
 ```
 
 ### Difficulty Levels
 
-| Difficulty | Unit Selection | Target Selection |
-|------------|---------------|-----------------|
-| Easy | Random | Random |
-| Medium | Prefer units that can attack | Random attackable enemy |
-| Hard | Prefer units near weak enemies | Lowest-HP enemy |
+| Difficulty | Unit Selection | Target Selection | Production Preference |
+|------------|---------------|-----------------|----------------------|
+| Easy | Random | Random | Infantry → Tank → Artillery |
+| Medium | Prefer units that can attack | Random attackable enemy | Artillery when even, Tank when outnumbered |
+| Hard | Prefer units near weak enemies | Lowest-HP enemy | Artillery when even, Tank when outnumbered |
+
+The AI spends 1 AP per production (same as a move/attack) and production is gated on having at least one Blue-owned, unoccupied city and enough `resources.Blue` to cover `UNIT_COSTS[type]`.
 
 ## 3D Rendering
 
@@ -421,5 +426,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.12.0
+Version: 1.13.0
 Last Updated: April 2026

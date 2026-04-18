@@ -1,12 +1,14 @@
-import type { Unit, Tile } from '../types/game';
-import { GRID_SIZE } from './constants';
+import type { Unit, Tile, UnitType, City } from '../types/game';
+import { GRID_SIZE, UNIT_COSTS } from './constants';
 import { calculateDamage } from './combat';
+import { createUnit } from './units';
 
 interface AIContext {
   grid: Tile[][];
   actionPoints: number;
   cooldowns: Record<string, number>;
   difficulty: 'easy' | 'medium' | 'hard';
+  funds: number;
 }
 
 type AIAction = {
@@ -24,10 +26,18 @@ type AIAction = {
   toX: number;
   toY: number;
   newGrid: Tile[][];
+} | {
+  type: 'produce';
+  unit: Unit;
+  unitType: UnitType;
+  x: number;
+  y: number;
+  cost: number;
+  newGrid: Tile[][];
 };
 
 export const computeAIAction = (ctx: AIContext): AIAction | null => {
-  const { grid, actionPoints, cooldowns, difficulty } = ctx;
+  const { grid, actionPoints, cooldowns, difficulty, funds } = ctx;
   const currentTime = Date.now();
 
   if (actionPoints <= 0 || grid.length === 0) return null;
@@ -45,17 +55,61 @@ export const computeAIAction = (ctx: AIContext): AIAction | null => {
       }
     }
   }
-  if (available.length === 0) return null;
 
   // Find all Red units
   const redUnits: { unit: Unit; x: number; y: number }[] = [];
+  // Blue-owned empty cities (factory candidates)
+  const blueFactories: { x: number; y: number }[] = [];
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE; x++) {
-      const unit = grid[y][x].unit;
+      const tile = grid[y][x];
+      const unit = tile.unit;
       if (unit?.player === 'Red') redUnits.push({ unit, x, y });
+      if (tile.terrain.isCity && !unit && (tile.terrain as City).owner === 'Blue') {
+        blueFactories.push({ x, y });
+      }
     }
   }
   if (redUnits.length === 0) return null;
+
+  // ── Produce a unit from an owned, empty city (if affordable) ─────────────
+  // Preferred order by difficulty: hard/medium favour Tank when outnumbered.
+  const blueCount = available.length;
+  const redCount = redUnits.length;
+  const outnumbered = blueCount < redCount;
+
+  if (blueFactories.length > 0) {
+    const order: UnitType[] = difficulty === 'easy'
+      ? (['Infantry', 'Tank', 'Artillery'] as const).slice() as UnitType[]
+      : outnumbered
+        ? ['Tank', 'Artillery', 'Infantry']
+        : ['Artillery', 'Tank', 'Infantry'];
+
+    const affordable = order.find(t => funds >= UNIT_COSTS[t]);
+    if (affordable) {
+      const factory = blueFactories[Math.floor(Math.random() * blueFactories.length)];
+      const newGrid: Tile[][] = grid.map(row =>
+        row.map(tile => ({
+          ...tile,
+          unit: tile.unit ? { ...tile.unit } : null,
+          terrain: { ...tile.terrain },
+        }))
+      );
+      const newUnit = createUnit(affordable, [factory.x, factory.y], 'Blue');
+      newGrid[factory.y][factory.x].unit = newUnit;
+      return {
+        type: 'produce',
+        unit: newUnit,
+        unitType: affordable,
+        x: factory.x,
+        y: factory.y,
+        cost: UNIT_COSTS[affordable],
+        newGrid,
+      };
+    }
+  }
+
+  if (available.length === 0) return null;
 
   // Pick a unit — prefer those that can attack
   let chosen: { unit: Unit; x: number; y: number };

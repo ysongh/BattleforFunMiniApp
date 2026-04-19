@@ -80,10 +80,10 @@ export const computeAIAction = (ctx: AIContext): AIAction | null => {
 
   if (blueFactories.length > 0) {
     const order: UnitType[] = difficulty === 'easy'
-      ? (['Infantry', 'Tank', 'Artillery'] as const).slice() as UnitType[]
+      ? ['Infantry', 'Tank', 'Artillery', 'Chopper']
       : outnumbered
-        ? ['Tank', 'Artillery', 'Infantry']
-        : ['Artillery', 'Tank', 'Infantry'];
+        ? ['Tank', 'Chopper', 'Artillery', 'Infantry']
+        : ['Artillery', 'Tank', 'Chopper', 'Infantry'];
 
     const affordable = order.find(t => funds >= UNIT_COSTS[t]);
     if (affordable) {

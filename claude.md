@@ -24,7 +24,7 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 - **Turn-Based Gameplay**: Players alternate turns to move units and attack
 - **Real-World Map Battlefield**: Units move directly on a live OpenStreetMap street map at the lobby-selected location. The 10×10 game grid is aligned to real geographic coordinates (~150 m × 150 m area, 15 m per cell) so unit footprints roughly match real street/road width. Terrain type (Road, Forest, City, etc.) is fetched from the Overpass API and cached in localStorage (keyed by lat/lng/cellMeters).
 - **Lobby Location Picker**: Before starting, the host picks where to fight on an interactive MapLibre world map (`LocationPicker`). Click anywhere on the map or drag the red marker to choose any point on Earth; 6 preset cities (NYC, Paris, London, Tokyo, Rome, San Francisco) are available as quick picks. The chosen `[lng, lat]` is passed to `Game.tsx` via React Router navigation state (`location.state.battleLocation`).
-- **Multiple Unit Types**: Infantry, Tanks, Artillery with distinct 3D shapes and stats
+- **Multiple Unit Types**: Infantry, Tanks, Artillery, Chopper — each with distinct 3D shapes and stats. Choppers fly over every terrain (movement cost = 1 everywhere, including Water/Mountain).
 - **Health System**: Units have HP, attack, and defense values shown as floating labels
 - **Movement and Attack Ranges**: Highlighted via colored overlay planes (blue = move, red = attack, yellow = selected)
 - **Hover Highlight**: Mousing over any tile shows a white semi-transparent overlay
@@ -42,7 +42,7 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 - **Three Difficulty Levels**: Easy (random), Medium (prioritizes attacks), Hard (targets weakest enemies)
 - **Automated Turn Execution**: AI acts every 3 seconds via interval
 - **Intelligent Targeting**: AI prioritizes weak enemies and optimal positioning
-- **Unit Production**: The AI spends its funds to produce new units from Blue-owned empty cities; prefers Tank when outnumbered, Artillery otherwise (Easy difficulty prefers Infantry)
+- **Unit Production**: The AI spends its funds to produce new units from Blue-owned empty cities. When outnumbered it prioritises Tank → Chopper → Artillery → Infantry; when even it prefers Artillery → Tank → Chopper → Infantry. Easy difficulty prefers cheaper units first (Infantry → Tank → Artillery → Chopper).
 
 ## Technical Stack
 
@@ -63,7 +63,7 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 ```typescript
 interface Unit {
   id: string;
-  type: UnitType;        // 'Infantry' | 'Tank' | 'Artillery'
+  type: UnitType;        // 'Infantry' | 'Tank' | 'Artillery' | 'Chopper'
   health: number;
   attack: number;
   defense: number;
@@ -80,7 +80,7 @@ interface Unit {
 - **Range Limit**: Units cannot move beyond their `moveRange`
 - **Collision Detection**: Units cannot move onto occupied tiles
 - **Grid Boundaries**: Movement is restricted to the 10×10 grid
-- **Terrain Movement Costs**: Road 0.5, Plain/City 1, Forest 2, Mountain 3, Water 4 — Water is traversable but expensive, so only fast units (Tank `moveRange: 5`) can cross a single tile. Units never spawn on Water or Mountain tiles (`findPassableTile` in `Game.tsx`).
+- **Terrain Movement Costs**: Road 0.5, Plain/City 1, Forest 2, Mountain 3, Water 4 — Water is traversable but expensive, so only fast units (Tank `moveRange: 5`) can cross a single tile. Choppers ignore terrain cost entirely (always 1 per tile) and can fly over Water/Mountain freely. Units never spawn on Water or Mountain tiles (`findPassableTile` in `Game.tsx`).
 
 ### Combat System
 
@@ -144,9 +144,9 @@ cost from resources.Blue.
 
 | Difficulty | Unit Selection | Target Selection | Production Preference |
 |------------|---------------|-----------------|----------------------|
-| Easy | Random | Random | Infantry → Tank → Artillery |
-| Medium | Prefer units that can attack | Random attackable enemy | Artillery when even, Tank when outnumbered |
-| Hard | Prefer units near weak enemies | Lowest-HP enemy | Artillery when even, Tank when outnumbered |
+| Easy | Random | Random | Infantry → Tank → Artillery → Chopper |
+| Medium | Prefer units that can attack | Random attackable enemy | Artillery → Tank → Chopper → Infantry (when even); Tank → Chopper → Artillery → Infantry (when outnumbered) |
+| Hard | Prefer units near weak enemies | Lowest-HP enemy | Artillery → Tank → Chopper → Infantry (when even); Tank → Chopper → Artillery → Infantry (when outnumbered) |
 
 The AI spends 1 AP per production (same as a move/attack) and production is gated on having at least one Blue-owned, unoccupied city and enough `resources.Blue` to cover `UNIT_COSTS[type]`.
 
@@ -168,7 +168,7 @@ Game.tsx (state, logic)
 │       │   ├── Terrain decoration (mountain peak / forest tree / city buildings)
 │       │   ├── Highlight overlay (blue/red/yellow transparent plane)
 │       │   ├── Hover overlay (white transparent plane on pointer-over)
-│       │   ├── Unit mesh (Infantry figure / tank hull+turret / artillery+barrel)
+│       │   ├── Unit mesh (Infantry figure / tank hull+turret / artillery+barrel / Chopper w/ spinning rotor)
 │       │   └── Html label (HP + cooldown timer via @react-three/drei)
 │       ├── DyingUnit × N (fall-fade-tilt animation + smoke particles on unit death)
 │       ├── Projectile (orange arc ball traveling attacker → defender on attack)
@@ -197,6 +197,7 @@ There are **no terrain tile meshes** — the real OSM map provides the visual gr
 | Infantry | Human figure (legs, torso, arms, head, helmet) holding an aiming rifle (brown stock + dark barrel) | Dimmed when on cooldown |
 | Tank | Box hull + box turret + barrel cylinder | Barrel points forward |
 | Artillery | Flat box base + angled long barrel | Barrel elevated ~36° |
+| Chopper | Body + cockpit glass + tail boom/fin + skids + spinning main rotor (via `useFrame`) | Hovers at y ≈ 0.38 so it reads as airborne |
 
 ### Camera & Controls
 
@@ -426,5 +427,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.14.0
+Version: 1.15.0
 Last Updated: April 2026

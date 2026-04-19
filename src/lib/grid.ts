@@ -104,7 +104,8 @@ export const calculateMovementRange = (unit: Unit, grid: Tile[][]): [number, num
       if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
 
       const tile = grid[ny][nx];
-      const newCost = cost + tile.terrain.movementCost;
+      const stepCost = unit.type === 'Chopper' ? 1 : tile.terrain.movementCost;
+      const newCost = cost + stepCost;
       if (newCost > budget) continue;
 
       const key = `${nx},${ny}`;

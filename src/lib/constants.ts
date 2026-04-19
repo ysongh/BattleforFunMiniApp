@@ -10,6 +10,7 @@ export const UNIT_COSTS: Record<UnitType, number> = {
   Infantry: 100,
   Tank: 300,
   Artillery: 250,
+  Chopper: 400,
 };
 
 export const UNIT_TYPES: Record<UnitType, Omit<Unit, 'id' | 'position' | 'player'>> = {
@@ -36,6 +37,14 @@ export const UNIT_TYPES: Record<UnitType, Omit<Unit, 'id' | 'position' | 'player
     defense: 5,
     moveRange: 3,
     attackRange: 3,
+  },
+  Chopper: {
+    type: 'Chopper',
+    health: 80,
+    attack: 65,
+    defense: 15,
+    moveRange: 6,
+    attackRange: 2,
   },
 };
 

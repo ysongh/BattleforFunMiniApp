@@ -33,6 +33,72 @@ const CITY_OWNER_COLOR: Record<string, string> = {
   none: '#d1d5db',
 };
 
+// ── Chopper ────────────────────────────────────────────────────────────────
+// Shared between live units and the dying-unit animation. Rotor spins via
+// useFrame for as long as the component is mounted.
+
+function Chopper({ baseColor }: { baseColor: string }) {
+  const rotorRef = useRef<THREE.Group>(null);
+  useFrame((_, delta) => {
+    if (rotorRef.current) rotorRef.current.rotation.y += delta * 18;
+  });
+  // Hovers slightly above the tile surface so it reads as airborne.
+  return (
+    <group position={[0, 0.38, 0]}>
+      {/* Body */}
+      <mesh castShadow>
+        <boxGeometry args={[0.34, 0.18, 0.24]} />
+        <meshLambertMaterial color={baseColor} />
+      </mesh>
+      {/* Cockpit glass */}
+      <mesh position={[0.14, 0.03, 0]}>
+        <sphereGeometry args={[0.11, 8, 8]} />
+        <meshLambertMaterial color="#1e3a8a" transparent opacity={0.7} />
+      </mesh>
+      {/* Tail boom */}
+      <mesh position={[-0.26, 0.02, 0]}>
+        <boxGeometry args={[0.32, 0.06, 0.06]} />
+        <meshLambertMaterial color={baseColor} />
+      </mesh>
+      {/* Tail fin */}
+      <mesh position={[-0.42, 0.08, 0]}>
+        <boxGeometry args={[0.04, 0.14, 0.04]} />
+        <meshLambertMaterial color={baseColor} />
+      </mesh>
+      {/* Tail rotor */}
+      <mesh position={[-0.42, 0.02, 0.06]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.09, 0.09, 0.01, 8]} />
+        <meshLambertMaterial color="#1f2937" transparent opacity={0.55} />
+      </mesh>
+      {/* Landing skids */}
+      <mesh position={[0, -0.11, 0.11]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.015, 0.015, 0.3, 6]} />
+        <meshLambertMaterial color="#374151" />
+      </mesh>
+      <mesh position={[0, -0.11, -0.11]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.015, 0.015, 0.3, 6]} />
+        <meshLambertMaterial color="#374151" />
+      </mesh>
+      {/* Main rotor mast */}
+      <mesh position={[0, 0.12, 0]}>
+        <cylinderGeometry args={[0.02, 0.02, 0.08, 6]} />
+        <meshLambertMaterial color="#374151" />
+      </mesh>
+      {/* Spinning main rotor */}
+      <group ref={rotorRef} position={[0, 0.17, 0]}>
+        <mesh>
+          <boxGeometry args={[0.8, 0.015, 0.05]} />
+          <meshLambertMaterial color="#1f2937" transparent opacity={0.5} />
+        </mesh>
+        <mesh rotation={[0, Math.PI / 2, 0]}>
+          <boxGeometry args={[0.8, 0.015, 0.05]} />
+          <meshLambertMaterial color="#1f2937" transparent opacity={0.5} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
 // ── Single tile ────────────────────────────────────────────────────────────
 
 interface TileProps {
@@ -239,6 +305,11 @@ function Tile3D({ tile, isSelected, isMovement, isAttack, isHovered, isUnitOnCoo
               </mesh>
             </>
           )}
+          {unit.type === 'Chopper' && (
+            <Chopper
+              baseColor={isUnitOnCooldown ? UNIT_DIM_COLOR[unit.player] : UNIT_BASE_COLOR[unit.player]}
+            />
+          )}
 
           {/* HP + cooldown label */}
           <Html position={[0, 0.72, 0]} center distanceFactor={7}>
@@ -438,6 +509,7 @@ function DyingUnit({ entry, onDone }: { entry: DyingEntry; onDone: (id: string) 
           </mesh>
         </>
       )}
+      {unit.type === 'Chopper' && <Chopper baseColor={color} />}
     </group>
   );
 }

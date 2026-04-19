@@ -20,6 +20,7 @@ import {
   IconSword,
   IconShield,
   IconTarget,
+  IconHelicopter,
   IconPlayerTrackNext,
   IconRobot,
   IconBolt,
@@ -32,6 +33,7 @@ const getUnitIcon = (type: UnitType) => {
     case 'Infantry': return <IconSword size={16} stroke={2.5} color="white" />;
     case 'Tank': return <IconShield size={16} stroke={2.5} color="white" />;
     case 'Artillery': return <IconTarget size={16} stroke={2.5} color="white" />;
+    case 'Chopper': return <IconHelicopter size={16} stroke={2.5} color="white" />;
   }
 };
 
@@ -878,6 +880,7 @@ const Game = () => {
               <p className="flex items-center gap-1"><IconSword size={12} /> Infantry — Basic</p>
               <p className="flex items-center gap-1"><IconShield size={12} /> Tank — Strong</p>
               <p className="flex items-center gap-1"><IconTarget size={12} /> Artillery — Long range</p>
+              <p className="flex items-center gap-1"><IconHelicopter size={12} /> Chopper — Flies over terrain</p>
             </div>
           </div>
         </aside>
@@ -899,7 +902,7 @@ const Game = () => {
             <p className="text-xs font-semibold flex items-center gap-1">
               <IconBuildingFactory size={12} /> Factory — Buy Unit
             </p>
-            {(['Infantry', 'Tank', 'Artillery'] as UnitType[]).map(unitType => (
+            {(['Infantry', 'Tank', 'Artillery', 'Chopper'] as UnitType[]).map(unitType => (
               <button
                 key={unitType}
                 className="w-full bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs font-semibold disabled:opacity-50 flex items-center justify-between"

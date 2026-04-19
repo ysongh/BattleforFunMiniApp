@@ -1,4 +1,4 @@
-export type UnitType = 'Infantry' | 'Tank' | 'Artillery';
+export type UnitType = 'Infantry' | 'Tank' | 'Artillery' | 'Chopper';
 export type TerrainType = 'Plain' | 'Mountain' | 'Forest' | 'City' | 'Road' | 'Water';
 export type Player = 'Red' | 'Blue';
 

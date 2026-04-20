@@ -637,7 +637,7 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
     const dy = camera.position.y - ORBIT_TARGET.y;
     const dz = camera.position.z - ORBIT_TARGET.z;
 
-    const bearing = Math.atan2(dx, -dz) * (180 / Math.PI);
+    const bearing = Math.atan2(-dx, dz) * (180 / Math.PI);
     const horiz   = Math.sqrt(dx * dx + dz * dz);
     const elev    = Math.atan2(dy, horiz) * (180 / Math.PI);
     const pitch   = Math.max(0, Math.min(60, 90 - elev));

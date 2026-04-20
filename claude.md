@@ -210,7 +210,7 @@ There are **no terrain tile meshes** — the real OSM map provides the visual gr
 `GridScene` runs a `useFrame` loop that computes **bearing** and **pitch** from the Three.js camera position relative to the orbit target `[4.5, 0, 4.5]`:
 
 ```typescript
-bearing = atan2(dx, -dz) * (180 / π)           // clockwise from –Z (north)
+bearing = atan2(-dx, dz) * (180 / π)           // MapLibre bearing; 0° when camera is at +Z of target (grid y=0 = geographic north)
 pitch   = clamp(90 − atan2(dy, horiz) * (180/π), 0, 60)  // MapLibre: 0=top-down, 60=horizon
 ```
 
@@ -427,5 +427,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.15.0
+Version: 1.15.1
 Last Updated: April 2026

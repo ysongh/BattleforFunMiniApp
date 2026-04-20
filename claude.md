@@ -263,7 +263,7 @@ Key CSS entry points:
 src/
 ├── pages/
 │   ├── Game.tsx              # Main game component (state, logic, UI panels); reads battleLocation from router state
-│   └── Lobby.tsx             # Pre-game lobby; players, settings, chat, and LocationPicker
+│   └── Lobby.tsx             # Pre-game lobby; AI difficulty picker, settings, chat, and LocationPicker
 ├── components/
 │   ├── GameBoard3D.tsx       # Transparent 3D canvas: units, decorations, highlights (r3f)
 │   ├── LocationPicker.tsx    # Interactive MapLibre world map in the Lobby — click/drag marker or use presets
@@ -297,7 +297,8 @@ npm run dev
 ### Lobby
 
 1. **Pick your Battle Location**: On the world map in the right column, click anywhere to drop the marker, drag the marker to refine, or use a preset city (NYC, Paris, London, Tokyo, Rome, San Francisco).
-2. Choose a faction, mark yourself Ready, optionally add AI opponents, and hit **Start Game**. The selected `[lng, lat]` is handed to `Game.tsx` via router state.
+2. **Pick AI Difficulty** (Easy / Medium / Hard) in the left column. The game is always Red (human) vs Blue (AI) — there is no multiplayer or faction selection in the lobby.
+3. Adjust game settings (optional) and hit **Start Game**. The selected `[lng, lat]` and difficulty are handed to `Game.tsx` via router state.
 
 ### Player Turn (Red)
 
@@ -427,5 +428,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.15.1
+Version: 1.15.2
 Last Updated: April 2026

@@ -2,29 +2,18 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import LocationPicker from '../components/LocationPicker';
 
-// Types
-interface Player {
-  id: string;
-  name: string;
-  faction: 'Red' | 'Blue' | 'Yellow' | 'Green' | null;
-  ready: boolean;
-  isAI?: boolean;
-  aiDifficulty?: 'easy' | 'medium' | 'hard';
-}
-
 interface GameSettings {
   startingFunds: number;
   fogOfWar: boolean;
   turnTimeLimit: number; // In seconds, 0 means no limit
 }
 
+type AIDifficulty = 'easy' | 'medium' | 'hard';
+
 const Lobby = ({ }) => {
   const navigate = useNavigate();
 
-  // Game state
-  const [players, setPlayers] = useState<Player[]>([
-    { id: "p1", name: "Player 1", faction: null, ready: false },
-  ]);
+  const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('medium');
 
   const [gameSettings, setGameSettings] = useState<GameSettings>({
     startingFunds: 10000,
@@ -33,34 +22,12 @@ const Lobby = ({ }) => {
   });
 
   const [chatMessages, setChatMessages] = useState<{sender: string, text: string}[]>([
-    { sender: "System", text: "Welcome to the game lobby! Pick a battle location on the map." },
+    { sender: "System", text: "Welcome! Pick a battle location and difficulty, then hit Start Game." },
   ]);
 
   const [chatInput, setChatInput] = useState("");
   // Battle location — click the map or pick a preset. Defaults to Central Park, NYC.
   const [battleLocation, setBattleLocation] = useState<[number, number]>([-73.9712, 40.7831]);
-  const [isHost] = useState(true); // First player is host by default
-
-  // Actions
-  const handleNameChange = (playerId: string, name: string) => {
-    setPlayers(players.map(p => p.id === playerId ? { ...p, name } : p));
-  };
-
-  const handleFactionChange = (playerId: string, faction: 'Red' | 'Blue' | 'Yellow' | 'Green' | null) => {
-    // Check if faction is already taken
-    const isFactionTaken = players.some(p => p.id !== playerId && p.faction === faction);
-    
-    if (isFactionTaken) {
-      addChatMessage("System", "This faction is already taken!");
-      return;
-    }
-    
-    setPlayers(players.map(p => p.id === playerId ? { ...p, faction } : p));
-  };
-
-  const handleReadyToggle = (playerId: string) => {
-    setPlayers(players.map(p => p.id === playerId ? { ...p, ready: !p.ready } : p));
-  };
 
   const handleSettingChange = (setting: keyof GameSettings, value: any) => {
     setGameSettings({ ...gameSettings, [setting]: value });
@@ -70,34 +37,7 @@ const Lobby = ({ }) => {
     setChatMessages([...chatMessages, { sender, text }]);
   };
 
-  const handleAddAIPlayer = () => {
-    if (players.length >= 4) {
-      addChatMessage("System", "Maximum of 4 players reached!");
-      return;
-    }
-    const aiId = `ai${Date.now()}`;
-    const aiNumber = players.filter(p => p.isAI).length + 1;
-    const newAI: Player = {
-      id: aiId,
-      name: `AI Player ${aiNumber}`,
-      faction: null,
-      ready: true,
-      isAI: true,
-      aiDifficulty: 'medium',
-    };
-    setPlayers([...players, newAI]);
-    addChatMessage("System", `AI Player ${aiNumber} joined the lobby.`);
-  };
-
-  const handleRemovePlayer = (playerId: string) => {
-    setPlayers(players.filter(p => p.id !== playerId));
-  };
-
-  const handleAIDifficultyChange = (playerId: string, difficulty: 'easy' | 'medium' | 'hard') => {
-    setPlayers(players.map(p => p.id === playerId ? { ...p, aiDifficulty: difficulty } : p));
-  };
-
-  const handleSendChat = (e) => {
+  const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
     if (chatInput.trim()) {
       addChatMessage("Player 1", chatInput.trim());
@@ -106,20 +46,10 @@ const Lobby = ({ }) => {
   };
 
   const handleStartGame = () => {
-    // Check if all players are ready and have selected factions
-    const allPlayersReady = players.every(p => p.ready && p.faction);
-    
-    if (!allPlayersReady) {
-      addChatMessage("System", "All players must be ready and have selected a faction!");
-      return;
-    }
-
-    const hasAIPlayer = players.some(p => p.isAI);
-    const aiPlayer = players.find(p => p.isAI);
     navigate('/game', {
       state: {
-        isAIEnabled: hasAIPlayer,
-        aiDifficulty: aiPlayer?.aiDifficulty ?? 'medium',
+        isAIEnabled: true,
+        aiDifficulty,
         battleLocation,
       },
     });
@@ -133,99 +63,48 @@ const Lobby = ({ }) => {
         <Link to="/game2">
           Game 2
         </Link>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left column - Players */}
+          {/* Left column - Opponent */}
           <div className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-xl font-semibold mb-4">Players</h2>
-            
-            <div className="space-y-4">
-              {players.map(player => (
-                <div key={player.id} className="border rounded-lg p-3">
-                  <div className="flex justify-between mb-2">
-                    <input
-                      type="text"
-                      value={player.name}
-                      onChange={(e) => handleNameChange(player.id, e.target.value)}
-                      className="border rounded px-2 py-1 w-full mr-2"
-                      placeholder="Enter name..."
-                      disabled={player.isAI}
-                    />
-                    {player.isAI ? (
-                      <button
-                        className="px-3 py-1 rounded bg-red-400 text-white text-sm whitespace-nowrap"
-                        onClick={() => handleRemovePlayer(player.id)}
-                      >
-                        Remove
-                      </button>
-                    ) : (
-                      <button
-                        className={`px-3 py-1 rounded ${player.ready ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
-                        onClick={() => handleReadyToggle(player.id)}
-                      >
-                        {player.ready ? 'Ready' : 'Not Ready'}
-                      </button>
-                    )}
-                  </div>
+            <h2 className="text-xl font-semibold mb-4">Opponent</h2>
 
-                  {player.isAI && (
-                    <div className="mb-2 flex items-center gap-2">
-                      <span className="text-xs text-gray-500">Difficulty:</span>
-                      {(['easy', 'medium', 'hard'] as const).map(level => (
-                        <button
-                          key={level}
-                          className={`px-2 py-0.5 text-xs rounded capitalize ${player.aiDifficulty === level ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-                          onClick={() => handleAIDifficultyChange(player.id, level)}
-                        >
-                          {level}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+            <p className="text-sm text-gray-600 mb-3">
+              You play as <span className="font-semibold text-red-600">Red</span> against an AI opponent (<span className="font-semibold text-blue-600">Blue</span>).
+            </p>
 
-                  <div className="grid grid-cols-4 gap-2">
-                    {(['Red', 'Blue', 'Yellow', 'Green'] as const).map(faction => (
-                      <button
-                        key={faction}
-                        className={`h-10 rounded-md ${player.faction === faction ? 'ring-2 ring-black' : ''}`}
-                        style={{ backgroundColor: faction.toLowerCase() }}
-                        onClick={() => handleFactionChange(player.id, faction)}
-                        aria-label={`Select ${faction} faction`}
-                      />
-                    ))}
-                  </div>
-                </div>
+            <label className="block text-gray-700 mb-2">AI Difficulty</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(['easy', 'medium', 'hard'] as const).map(level => (
+                <button
+                  key={level}
+                  className={`px-3 py-2 text-sm rounded capitalize ${aiDifficulty === level ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                  onClick={() => setAiDifficulty(level)}
+                >
+                  {level}
+                </button>
               ))}
-
-              <button
-                className="bg-blue-500 text-white px-4 py-2 rounded w-full disabled:opacity-50"
-                onClick={handleAddAIPlayer}
-                disabled={players.length >= 4}
-              >
-                Add AI Player
-              </button>
             </div>
           </div>
-          
+
           {/* Middle column - Game Settings */}
           <div className="bg-white rounded-lg shadow p-4">
             <h2 className="text-xl font-semibold mb-4">Game Settings</h2>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-gray-700 mb-1">Starting Funds</label>
-                <select 
+                <select
                   className="w-full border rounded px-3 py-2"
                   value={gameSettings.startingFunds}
                   onChange={(e) => handleSettingChange('startingFunds', parseInt(e.target.value))}
-                  disabled={!isHost}
                 >
                   <option value={5000}>5,000 (Low)</option>
                   <option value={10000}>10,000 (Standard)</option>
                   <option value={20000}>20,000 (High)</option>
                 </select>
               </div>
-              
+
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -233,18 +112,16 @@ const Lobby = ({ }) => {
                   checked={gameSettings.fogOfWar}
                   onChange={(e) => handleSettingChange('fogOfWar', e.target.checked)}
                   className="mr-2"
-                  disabled={!isHost}
                 />
                 <label htmlFor="fogOfWar">Fog of War</label>
               </div>
-              
+
               <div>
                 <label className="block text-gray-700 mb-1">Turn Time Limit</label>
-                <select 
+                <select
                   className="w-full border rounded px-3 py-2"
                   value={gameSettings.turnTimeLimit}
                   onChange={(e) => handleSettingChange('turnTimeLimit', parseInt(e.target.value))}
-                  disabled={!isHost}
                 >
                   <option value={0}>No Limit</option>
                   <option value={60}>60 seconds</option>
@@ -252,18 +129,16 @@ const Lobby = ({ }) => {
                   <option value={300}>5 minutes</option>
                 </select>
               </div>
-              
-              {isHost && (
-                <button
-                  className="bg-green-600 text-white px-4 py-2 rounded w-full mt-6"
-                  onClick={handleStartGame}
-                >
-                  Start Game
-                </button>
-              )}
+
+              <button
+                className="bg-green-600 text-white px-4 py-2 rounded w-full mt-6"
+                onClick={handleStartGame}
+              >
+                Start Game
+              </button>
             </div>
           </div>
-          
+
           {/* Right column - Battle Location & Chat */}
           <div className="space-y-6">
             {/* Battle Location */}
@@ -275,7 +150,7 @@ const Lobby = ({ }) => {
             {/* Chat */}
             <div className="bg-white rounded-lg shadow p-4 flex flex-col h-64">
               <h2 className="text-xl font-semibold mb-2">Chat</h2>
-              
+
               <div className="flex-1 overflow-y-auto mb-3 space-y-2">
                 {chatMessages.map((msg, index) => (
                   <div key={index} className="text-sm">
@@ -284,7 +159,7 @@ const Lobby = ({ }) => {
                   </div>
                 ))}
               </div>
-              
+
               <form onSubmit={handleSendChat} className="flex">
                 <input
                   type="text"

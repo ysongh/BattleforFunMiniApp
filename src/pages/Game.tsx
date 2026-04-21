@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import type { UnitType, Player, City, Unit, Tile } from '../types/game';
 import { computeAIAction } from '../lib/ai';
 import { calculateDamage, countPlayerUnits } from '../lib/combat';
-import { GRID_SIZE, COOLDOWN_DURATION, AP_REGEN_INTERVAL, AI_ACTION_INTERVAL, MAX_AP, UNIT_COSTS } from '../lib/constants';
+import { GRID_SIZE, setGridSize, COOLDOWN_DURATION, AP_REGEN_INTERVAL, AI_ACTION_INTERVAL, MAX_AP, UNIT_COSTS } from '../lib/constants';
 import { generateInitialGrid, calculateMovementRange as calcMovementRange, calculateAttackRange as calcAttackRange, findEnemiesInRange as findEnemies } from '../lib/grid';
 import { createUnit } from '../lib/units';
 import GameBoard3D from '../components/GameBoard3D';
@@ -14,7 +14,7 @@ import { fetchRealTerrain } from '../lib/realMap';
 import type { TerrainType } from '../types/game';
 
 const DEFAULT_MAP_CENTER: [number, number] = [-73.9712, 40.7831];
-const MAP_ZOOM = 18;
+const BASE_MAP_ZOOM = 18; // zoom for a 10×10 grid — scales down for larger maps
 import { playAttack, playCounterAttack, playImpact, playDestroyed, playSelect, playMove, playCaptured, playVictory, playDefeat } from '../lib/sounds';
 import {
   IconSword,
@@ -44,8 +44,10 @@ const Game = () => {
     isAIEnabled?: boolean;
     aiDifficulty?: 'easy' | 'medium' | 'hard';
     battleLocation?: [number, number];
+    mapSize?: 10 | 20 | 30;
   } | null;
   const MAP_CENTER: [number, number] = lobbyState?.battleLocation ?? DEFAULT_MAP_CENTER;
+  const MAP_SIZE = lobbyState?.mapSize ?? 10;
 
   const [grid, setGrid] = useState<Tile[][]>([]);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
@@ -121,10 +123,11 @@ const Game = () => {
 
   // Initialize game — fetch real-world terrain first, then build the grid
   useEffect(() => {
+    setGridSize(MAP_SIZE);
     let cancelled = false;
     (async () => {
       setTerrainLoading(true);
-      const terrain: TerrainType[][] | null = await fetchRealTerrain(MAP_CENTER[0], MAP_CENTER[1]);
+      const terrain: TerrainType[][] | null = await fetchRealTerrain(MAP_CENTER[0], MAP_CENTER[1], MAP_SIZE);
       if (!cancelled) {
         initializeGame(terrain ?? undefined);
         setTerrainLoading(false);
@@ -832,7 +835,7 @@ const Game = () => {
         {/* Center — 3D board (fills remaining space) */}
         <div className="relative flex-1 min-w-0 min-h-[420px] lg:min-h-0 lg:h-full rounded-lg overflow-hidden shadow-lg">
           {/* Real-world map backdrop */}
-          <MapLibreBackdrop ref={mapBackdropRef} center={MAP_CENTER} zoom={MAP_ZOOM} />
+          <MapLibreBackdrop ref={mapBackdropRef} center={MAP_CENTER} zoom={BASE_MAP_ZOOM - Math.log2(MAP_SIZE / 10)} />
 
           {/* Loading overlay while terrain data is fetched */}
           {terrainLoading && (

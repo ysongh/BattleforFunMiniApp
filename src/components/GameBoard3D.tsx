@@ -614,17 +614,24 @@ interface GridSceneProps {
   mapBackdropRef?: React.RefObject<MapLibreBackdropHandle | null>;
 }
 
-const ORBIT_TARGET = new THREE.Vector3(4.5, 0, 4.5);
-
 function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldowns, now, onTileClick, attackEvent, mapBackdropRef }: GridSceneProps) {
   const moveSet = new Set(movementRange.map(([x, y]) => `${x},${y}`));
   const attackSet = new Set(attackRange.map(([x, y]) => `${x},${y}`));
   const [hoveredTile, setHoveredTile] = useState<string | null>(null);
 
+  // Grid-size-aware camera config. For a 10×10 grid this reproduces the
+  // original values: target (4.5, 0, 4.5), initial camera ~[4.5, 13, 16], maxDistance 24.
+  const N = grid.length || 10;
+  const center = (N - 1) / 2;
+  const ORBIT_TARGET = new THREE.Vector3(center, 0, center);
+  const SCALE = N / 10;
+
   // ── MapLibre camera sync ──────────────────────────────────────────────────
-  // Reference distance: initial camera [4.5,13,16] → target [4.5,0,4.5]
-  // dist = sqrt(0² + 13² + 11.5²) ≈ 17.36 units → MAP_ZOOM 18
-  const BASE_DIST = Math.sqrt(13 * 13 + 11.5 * 11.5); // ≈ 17.36
+  // BASE_DIST/BASE_ZOOM map *unit-space* distance to MapLibre zoom. Since each
+  // cell is always 15 real meters regardless of grid size, this ratio is
+  // invariant — bigger grids just need the camera further out, and the log2
+  // formula below naturally derives a lower zoom.
+  const BASE_DIST = Math.sqrt(13 * 13 + 11.5 * 11.5); // ≈ 17.36 (10×10 reference)
   const BASE_ZOOM = 18;
 
   const lastBearingRef = useRef<number | null>(null);
@@ -713,11 +720,11 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
       <ambientLight intensity={0.65} />
       <directionalLight position={[8, 14, 8]} intensity={1.1} castShadow />
       <OrbitControls
-        target={[4.5, 0, 4.5]}
+        target={[center, 0, center]}
         minPolarAngle={0.3}
         maxPolarAngle={Math.PI / 2.1}
-        minDistance={5}
-        maxDistance={24}
+        minDistance={5 * SCALE}
+        maxDistance={24 * SCALE}
       />
 
       {grid.map(row =>
@@ -838,12 +845,18 @@ export default function GameBoard3D(props: GameBoard3DProps) {
 
   if (!props.grid.length) return null;
 
+  const N = props.grid.length;
+  const center = (N - 1) / 2;
+  const scale = N / 10;
+  const cameraPosition: [number, number, number] = [center, 13 * scale, center + 11.5 * scale];
+
   return (
     // position: absolute + inset: 0 overlays the canvas exactly over the
     // MapLibreBackdrop (also absolute inset-0). z-index: 1 keeps it on top.
     <div ref={canvasRef} style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
       <Canvas
-        camera={{ position: [4.5, 13, 16], fov: 42 }}
+        key={N}
+        camera={{ position: cameraPosition, fov: 42 }}
         shadows
         gl={{ antialias: true, alpha: true, premultipliedAlpha: false }}
         style={{ background: 'transparent' }}

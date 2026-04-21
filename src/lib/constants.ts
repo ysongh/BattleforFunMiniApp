@@ -1,6 +1,12 @@
 import type { UnitType, Terrain, TerrainType, Unit } from '../types/game';
 
-export const GRID_SIZE = 10;
+export let GRID_SIZE = 10;
+
+/** Update the active grid size. Call before generating a new grid; downstream
+ *  modules read GRID_SIZE via live ES module bindings and see the new value. */
+export function setGridSize(n: number) {
+  GRID_SIZE = n;
+}
 export const COOLDOWN_DURATION = 10000; // 10 seconds
 export const AP_REGEN_INTERVAL = 10000; // 1 AP every 10 seconds
 export const AI_ACTION_INTERVAL = 3000; // AI tries to act every 3 seconds

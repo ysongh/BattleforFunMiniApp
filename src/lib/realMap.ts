@@ -146,9 +146,9 @@ const OVERPASS_ENDPOINTS = [
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ];
 
-/** Cache key based on location + cell size — different cell sizes get separate caches. */
-function cacheKey(lng: number, lat: number, cellMeters: number) {
-  return `realmap_${lng.toFixed(4)}_${lat.toFixed(4)}_${cellMeters}`;
+/** Cache key based on location + cell size + grid size — different map sizes get separate caches. */
+function cacheKey(lng: number, lat: number, cellMeters: number, gridSize: number) {
+  return `realmap_${lng.toFixed(4)}_${lat.toFixed(4)}_${cellMeters}_${gridSize}`;
 }
 
 async function fetchFromAnyEndpoint(query: string): Promise<{ elements: OsmElement[] }> {
@@ -182,7 +182,7 @@ export async function fetchRealTerrain(
   cellMeters = 15,
 ): Promise<TerrainType[][] | null> {
   // ── Check cache first ────────────────────────────────────────────────────
-  const key = cacheKey(centerLng, centerLat, cellMeters);
+  const key = cacheKey(centerLng, centerLat, cellMeters, gridSize);
   try {
     const cached = localStorage.getItem(key);
     if (cached) {

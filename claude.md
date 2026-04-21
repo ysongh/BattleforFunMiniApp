@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, built with React 19, TypeScript, Tailwind CSS, `@react-three/fiber` for a 3D battlefield, and MapLibre GL JS for real-world map rendering. Players command units on a 10×10 grid that is overlaid directly on a real OpenStreetMap street map. Before the match, players pick a battle location anywhere in the world from the Lobby's interactive world map (defaults to Central Park / Upper West Side, NYC). The game includes an AI opponent with three difficulty levels.
+BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, built with React 19, TypeScript, Tailwind CSS, `@react-three/fiber` for a 3D battlefield, and MapLibre GL JS for real-world map rendering. Players command units on a square grid (10×10, 20×20, or 30×30 — chosen in the lobby) that is overlaid directly on a real OpenStreetMap street map. Before the match, players pick a battle location anywhere in the world from the Lobby's interactive world map (defaults to Central Park / Upper West Side, NYC). The game includes an AI opponent with three difficulty levels.
 
 ## Table of Contents
 
@@ -22,7 +22,8 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 ### Core Features
 
 - **Turn-Based Gameplay**: Players alternate turns to move units and attack
-- **Real-World Map Battlefield**: Units move directly on a live OpenStreetMap street map at the lobby-selected location. The 10×10 game grid is aligned to real geographic coordinates (~150 m × 150 m area, 15 m per cell) so unit footprints roughly match real street/road width. Terrain type (Road, Forest, City, etc.) is fetched from the Overpass API and cached in localStorage (keyed by lat/lng/cellMeters).
+- **Real-World Map Battlefield**: Units move directly on a live OpenStreetMap street map at the lobby-selected location. The game grid (10×10, 20×20, or 30×30 — picked in the lobby) is aligned to real geographic coordinates at 15 m per cell, so unit footprints roughly match real street/road width. Total battlefield area scales with grid size: 150 m / 300 m / 450 m on a side. Terrain type (Road, Forest, City, etc.) is fetched from the Overpass API and cached in localStorage (keyed by lat/lng/cellMeters/gridSize so different sizes get separate caches).
+- **Selectable Map Size**: The lobby's Game Settings panel offers a 10×10 / 20×20 / 30×30 picker. The chosen size is passed to `Game.tsx` via router state (`location.state.mapSize`), which calls `setGridSize()` on the constants module before generating the grid — `GRID_SIZE` is a mutable `let` binding so all downstream modules (grid.ts, ai.ts, combat.ts, realMap.ts) see the new value automatically. Camera target, distance limits, and MapLibre initial zoom in `GameBoard3D`/`Game.tsx` scale with grid size so larger boards fit the viewport.
 - **Lobby Location Picker**: Before starting, the host picks where to fight on an interactive MapLibre world map (`LocationPicker`). Click anywhere on the map or drag the red marker to choose any point on Earth; 6 preset cities (NYC, Paris, London, Tokyo, Rome, San Francisco) are available as quick picks. The chosen `[lng, lat]` is passed to `Game.tsx` via React Router navigation state (`location.state.battleLocation`).
 - **Multiple Unit Types**: Infantry, Tanks, Artillery, Chopper — each with distinct 3D shapes and stats. Choppers fly over every terrain (movement cost = 1 everywhere, including Water/Mountain).
 - **Health System**: Units have HP, attack, and defense values shown as floating labels
@@ -69,7 +70,7 @@ interface Unit {
   defense: number;
   moveRange: number;
   attackRange: number;
-  position: [number, number];  // [x, y] grid coordinates (0–9)
+  position: [number, number];  // [x, y] grid coordinates (0 to GRID_SIZE-1)
   player: Player;              // 'Red' | 'Blue'
 }
 ```
@@ -79,7 +80,7 @@ interface Unit {
 - **Dijkstra Pathfinding**: Movement respects terrain movement costs
 - **Range Limit**: Units cannot move beyond their `moveRange`
 - **Collision Detection**: Units cannot move onto occupied tiles
-- **Grid Boundaries**: Movement is restricted to the 10×10 grid
+- **Grid Boundaries**: Movement is restricted to the active grid (`GRID_SIZE × GRID_SIZE`, set from the lobby's Map Size picker)
 - **Terrain Movement Costs**: Road 0.5, Plain/City 1, Forest 2, Mountain 3, Water 4 — Water is traversable but expensive, so only fast units (Tank `moveRange: 5`) can cross a single tile. Choppers ignore terrain cost entirely (always 1 per tile) and can fly over Water/Mountain freely. Units never spawn on Water or Mountain tiles (`findPassableTile` in `Game.tsx`).
 
 ### Combat System
@@ -163,7 +164,7 @@ Game.tsx (state, logic)
 │   └── SceneClear (useThree — sets gl.setClearColor(0,0,0,0) + scene.background=null)
 │   └── GridScene (ambientLight, directionalLight, OrbitControls)
 │       ├── useFrame → computes bearing/pitch → calls mapBackdropRef.setCamera()
-│       ├── Tile3D × 100 (one per grid cell — NO terrain mesh, units sit on the real map)
+│       ├── Tile3D × N² (one per grid cell, where N = GRID_SIZE — NO terrain mesh, units sit on the real map)
 │       │   ├── Invisible hitbox plane (single raycast target, prevents hover flicker)
 │       │   ├── Terrain decoration (mountain peak / forest tree / city buildings)
 │       │   ├── Highlight overlay (blue/red/yellow transparent plane)
@@ -201,13 +202,15 @@ There are **no terrain tile meshes** — the real OSM map provides the visual gr
 
 ### Camera & Controls
 
-- **Initial position**: `[4.5, 13, 16]` looking toward `[4.5, 0, 4.5]`
+- **Initial position**: `[center, 13·SCALE, center + 11.5·SCALE]` looking toward `[center, 0, center]`, where `center = (GRID_SIZE − 1) / 2` and `SCALE = GRID_SIZE / 10`. For a 10×10 grid this is `[4.5, 13, 16]` → `[4.5, 0, 4.5]`; for 20×20 it's `[9.5, 26, 32.5]` → `[9.5, 0, 9.5]`.
 - **OrbitControls**: drag to rotate, scroll to zoom, right-drag to pan
+- `minDistance` / `maxDistance` scale linearly with `SCALE` so larger grids can be zoomed out further
+- `<Canvas key={N}>` remounts the canvas when grid size changes so the camera resets cleanly
 - `maxPolarAngle`: prevents camera going below ground
 
 ### MapLibre Backdrop Sync
 
-`GridScene` runs a `useFrame` loop that computes **bearing** and **pitch** from the Three.js camera position relative to the orbit target `[4.5, 0, 4.5]`:
+`GridScene` runs a `useFrame` loop that computes **bearing** and **pitch** from the Three.js camera position relative to the orbit target `[center, 0, center]`:
 
 ```typescript
 bearing = atan2(-dx, dz) * (180 / π)           // MapLibre bearing; 0° when camera is at +Z of target (grid y=0 = geographic north)
@@ -216,13 +219,15 @@ pitch   = clamp(90 − atan2(dy, horiz) * (180/π), 0, 60)  // MapLibre: 0=top-d
 
 Updates are throttled to fire only when bearing changes >0.4°, pitch changes >0.4°, or zoom changes >0.05. Changes are pushed imperatively via `mapBackdropRef.current.setCamera(bearing, pitch, zoom)` — no React state update, no re-render. `MapLibreBackdrop` calls `map.jumpTo({ bearing, pitch, zoom })` for instant (zero-lag) sync.
 
-Zoom is derived from camera distance to the orbit target:
+Zoom is derived from camera distance to the orbit target. The unit-distance → MapLibre-zoom relationship is invariant across grid sizes (one cell is always 15 real metres), so `BASE_DIST` and `BASE_ZOOM` are constants — bigger grids just need the camera further out, and the log2 formula naturally produces a lower zoom:
 ```typescript
-const BASE_DIST = Math.sqrt(13² + 11.5²)  // ≈ 17.36 — initial camera distance
+const BASE_DIST = Math.sqrt(13² + 11.5²)  // ≈ 17.36 — 10×10 reference distance
 const BASE_ZOOM = 18                        // MapLibre zoom at that distance
 zoom = clamp(BASE_ZOOM - log2(dist / BASE_DIST), 10, 20)
 // doubling camera distance → zoom −1; halving → zoom +1
 ```
+
+The MapLibre backdrop's *initial* zoom is set in `Game.tsx` to `BASE_MAP_ZOOM − log2(MAP_SIZE / 10)` so the first frame is already roughly framed for the chosen grid size.
 
 ### Canvas Transparency
 
@@ -272,7 +277,7 @@ src/
 ├── lib/
 │   ├── ai.ts                 # AI decision logic (computeAIAction)
 │   ├── combat.ts             # Damage calculation, win condition checks
-│   ├── constants.ts          # Game constants, unit stats, terrain definitions
+│   ├── constants.ts          # Game constants, unit stats, terrain definitions; GRID_SIZE is a mutable `let` with setGridSize()
 │   ├── grid.ts               # Grid generation, movement/attack range, terrain helpers
 │   ├── realMap.ts            # Overpass API fetch → TerrainType[][] grid; localStorage cache; multi-endpoint fallback
 │   ├── sounds.ts             # Tone.js synthesized sound effects (8 events)
@@ -298,7 +303,8 @@ npm run dev
 
 1. **Pick your Battle Location**: On the world map in the right column, click anywhere to drop the marker, drag the marker to refine, or use a preset city (NYC, Paris, London, Tokyo, Rome, San Francisco).
 2. **Pick AI Difficulty** (Easy / Medium / Hard) in the left column. The game is always Red (human) vs Blue (AI) — there is no multiplayer or faction selection in the lobby.
-3. Adjust game settings (optional) and hit **Start Game**. The selected `[lng, lat]` and difficulty are handed to `Game.tsx` via router state.
+3. **Pick Map Size** (10×10 / 20×20 / 30×30) in the Game Settings panel. Bigger maps mean more terrain to explore and longer matches.
+4. Adjust other game settings (optional) and hit **Start Game**. The selected `[lng, lat]`, difficulty, and map size are handed to `Game.tsx` via router state.
 
 ### Player Turn (Red)
 
@@ -369,6 +375,7 @@ navigate('/game', {
     isAIEnabled,
     aiDifficulty,
     battleLocation,    // [lng, lat]
+    mapSize,           // 10 | 20 | 30
   },
 });
 
@@ -377,11 +384,18 @@ const lobbyState = location.state as {
   isAIEnabled?: boolean;
   aiDifficulty?: 'easy' | 'medium' | 'hard';
   battleLocation?: [number, number];
+  mapSize?: 10 | 20 | 30;
 } | null;
 const MAP_CENTER: [number, number] = lobbyState?.battleLocation ?? DEFAULT_MAP_CENTER;
+const MAP_SIZE = lobbyState?.mapSize ?? 10;
+
+useEffect(() => {
+  setGridSize(MAP_SIZE);                                          // mutate the live GRID_SIZE binding
+  fetchRealTerrain(MAP_CENTER[0], MAP_CENTER[1], MAP_SIZE).then(initializeGame);
+}, []);
 ```
 
-`MAP_CENTER` feeds both `fetchRealTerrain(lng, lat)` for Overpass terrain lookup and `<MapLibreBackdrop center={MAP_CENTER} />`.
+`MAP_CENTER` feeds both `fetchRealTerrain(lng, lat, MAP_SIZE)` for Overpass terrain lookup and `<MapLibreBackdrop center={MAP_CENTER} zoom={BASE_MAP_ZOOM − log2(MAP_SIZE/10)} />`. Calling `setGridSize()` before any grid logic ensures every consumer of `GRID_SIZE` (grid.ts, ai.ts, combat.ts, realMap.ts) reads the new value via live ES module bindings.
 
 ### Key State in Game.tsx
 
@@ -428,5 +442,5 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-Version: 1.15.2
+Version: 1.16.0
 Last Updated: April 2026

@@ -531,17 +531,19 @@ function Projectile({ attackerPos, defenderPos, ah, dh, startTime }: {
   const pdx = defenderPos[0] - attackerPos[0];
   const pdz = defenderPos[1] - attackerPos[1];
   const dist = Math.sqrt(pdx * pdx + pdz * pdz);
-  const arcHeight = 0.5 + dist * 0.18; // taller arc for longer shots
+  const isStraight = dist <= 1.5; // close-range (range-1) attacks fire flat
+  const arcHeight = isStraight ? 0 : 1.2 + dist * 0.35;
+  const duration = isStraight ? PROJECTILE_DURATION * 0.55 : PROJECTILE_DURATION;
 
   useFrame(() => {
     if (!meshRef.current) return;
     const elapsed = performance.now() - startTime;
-    const t = Math.min(elapsed / PROJECTILE_DURATION, 1);
+    const t = Math.min(elapsed / duration, 1);
 
     const x = attackerPos[0] + pdx * t;
     const z = attackerPos[1] + pdz * t;
     const baseY = ah + (dh - ah) * t + 0.35; // start slightly above tile
-    const arcY = Math.sin(t * Math.PI) * arcHeight;
+    const arcY = isStraight ? 0 : Math.sin(t * Math.PI) * arcHeight;
 
     meshRef.current.position.set(x, baseY + arcY, z);
     meshRef.current.visible = t < 1;
@@ -780,6 +782,10 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
         if (!attackerTile || !defenderTile) return null;
         const ah = TERRAIN_HEIGHT[attackerTile.terrain.type];
         const dh = TERRAIN_HEIGHT[defenderTile.terrain.type];
+        const ddx = dx - ax;
+        const ddy = dy - ay;
+        const shotDist = Math.sqrt(ddx * ddx + ddy * ddy);
+        const travel = shotDist <= 1.5 ? PROJECTILE_DURATION * 0.55 : PROJECTILE_DURATION;
         return (
           <>
             {/* Initial attack projectile */}
@@ -796,7 +802,7 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
               defenderPos={attackEvent.defenderPos}
               h={dh}
               startTime={attackEvent.timestamp}
-              delay={PROJECTILE_DURATION - 30}
+              delay={travel - 30}
             />
             {/* Counter-attack projectile — fires after first ball lands */}
             {attackEvent.hasCounter && (
@@ -807,14 +813,14 @@ function GridScene({ grid, selectedUnit, movementRange, attackRange, unitCooldow
                   defenderPos={attackEvent.attackerPos}
                   ah={dh}
                   dh={ah}
-                  startTime={attackEvent.timestamp + PROJECTILE_DURATION}
+                  startTime={attackEvent.timestamp + travel}
                 />
                 <ImpactFlash
                   key={`counter-flash-${attackEvent.timestamp}`}
                   defenderPos={attackEvent.attackerPos}
                   h={ah}
-                  startTime={attackEvent.timestamp + PROJECTILE_DURATION}
-                  delay={PROJECTILE_DURATION - 30}
+                  startTime={attackEvent.timestamp + travel}
+                  delay={travel - 30}
                 />
               </>
             )}

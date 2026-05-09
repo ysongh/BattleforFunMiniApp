@@ -46,7 +46,7 @@ export const UNIT_TYPES: Record<UnitType, Omit<Unit, 'id' | 'position' | 'player
   },
   Chopper: {
     type: 'Chopper',
-    health: 80,
+    health: 100,
     attack: 65,
     defense: 15,
     moveRange: 6,

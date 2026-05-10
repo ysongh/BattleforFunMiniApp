@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, built with React 19, TypeScript, Tailwind CSS, `@react-three/fiber` for a 3D battlefield, and MapLibre GL JS for real-world map rendering. Players command units on a square grid (10×10, 20×20, or 30×30 — chosen in the lobby) that is overlaid directly on a real OpenStreetMap street map. Before the match, players pick a battle location anywhere in the world from the Lobby's interactive world map (defaults to Central Park / Upper West Side, NYC). The game includes an AI opponent with three difficulty levels.
+BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, built with React 19, TypeScript, Tailwind CSS, `@react-three/fiber` for a 3D battlefield, and MapLibre GL JS for real-world map rendering. Players command units on a square grid (10×10, 15×15, or 20×20 — chosen in the lobby) that is overlaid directly on a real OpenStreetMap street map. Before the match, players pick a battle location anywhere in the world from the Lobby's interactive world map (defaults to Central Park / Upper West Side, NYC). The game includes an AI opponent with three difficulty levels.
 
 ## Table of Contents
 
@@ -22,8 +22,8 @@ BattleforFunMiniApp is a turn-based strategy game inspired by Advance Wars, buil
 ### Core Features
 
 - **Turn-Based Gameplay**: Players alternate turns to move units and attack
-- **Real-World Map Battlefield**: Units move directly on a live OpenStreetMap street map at the lobby-selected location. The game grid (10×10, 20×20, or 30×30 — picked in the lobby) is aligned to real geographic coordinates at 15 m per cell, so unit footprints roughly match real street/road width. Total battlefield area scales with grid size: 150 m / 300 m / 450 m on a side. Terrain type (Road, Forest, City, etc.) is fetched from the Overpass API and cached in localStorage (keyed by lat/lng/cellMeters/gridSize so different sizes get separate caches).
-- **Selectable Map Size**: The lobby's Game Settings panel offers a 10×10 / 20×20 / 30×30 picker. The chosen size is passed to `Game.tsx` via router state (`location.state.mapSize`), which calls `setGridSize()` on the constants module before generating the grid — `GRID_SIZE` is a mutable `let` binding so all downstream modules (grid.ts, ai.ts, combat.ts, realMap.ts) see the new value automatically. Camera target, distance limits, and MapLibre initial zoom in `GameBoard3D`/`Game.tsx` scale with grid size so larger boards fit the viewport.
+- **Real-World Map Battlefield**: Units move directly on a live OpenStreetMap street map at the lobby-selected location. The game grid (10×10, 15×15, or 20×20 — picked in the lobby) is aligned to real geographic coordinates at 15 m per cell, so unit footprints roughly match real street/road width. Total battlefield area scales with grid size: 150 m / 225 m / 300 m on a side. Terrain type (Road, Forest, City, etc.) is fetched from the Overpass API and cached in localStorage (keyed by lat/lng/cellMeters/gridSize so different sizes get separate caches).
+- **Selectable Map Size**: The lobby's Game Settings panel offers a 10×10 / 15×15 / 20×20 picker. The chosen size is passed to `Game.tsx` via router state (`location.state.mapSize`), which calls `setGridSize()` on the constants module before generating the grid — `GRID_SIZE` is a mutable `let` binding so all downstream modules (grid.ts, ai.ts, combat.ts, realMap.ts) see the new value automatically. Camera target, distance limits, and MapLibre initial zoom in `GameBoard3D`/`Game.tsx` scale with grid size so larger boards fit the viewport.
 - **Lobby Location Picker**: Before starting, the host picks where to fight on an interactive MapLibre world map (`LocationPicker`). Click anywhere on the map or drag the red marker to choose any point on Earth; 6 preset cities (NYC, Paris, London, Tokyo, Rome, San Francisco) are available as quick picks. The chosen `[lng, lat]` is passed to `Game.tsx` via React Router navigation state (`location.state.battleLocation`).
 - **Multiple Unit Types**: Infantry, Tanks, Artillery, Chopper — each with distinct 3D shapes and stats. Choppers fly over every terrain (movement cost = 1 everywhere, including Water/Mountain).
 - **Health System**: Units have HP, attack, and defense values shown as floating labels
@@ -305,7 +305,7 @@ npm run dev
 
 1. **Pick your Battle Location**: On the world map in the right column, click anywhere to drop the marker, drag the marker to refine, or use a preset city (NYC, Paris, London, Tokyo, Rome, San Francisco).
 2. **Pick AI Difficulty** (Easy / Medium / Hard) in the left column. The game is always Red (human) vs Blue (AI) — there is no multiplayer or faction selection in the lobby.
-3. **Pick Map Size** (10×10 / 20×20 / 30×30) in the Game Settings panel. Bigger maps mean more terrain to explore and longer matches.
+3. **Pick Map Size** (10×10 / 15×15 / 20×20) in the Game Settings panel. Bigger maps mean more terrain to explore and longer matches.
 4. Adjust other game settings (optional) and hit **Start Game**. The selected `[lng, lat]`, difficulty, and map size are handed to `Game.tsx` via router state.
 
 ### Player Turn (Red)
@@ -377,7 +377,7 @@ navigate('/game', {
     isAIEnabled,
     aiDifficulty,
     battleLocation,    // [lng, lat]
-    mapSize,           // 10 | 20 | 30
+    mapSize,           // 10 | 15 | 20
   },
 });
 
@@ -386,7 +386,7 @@ const lobbyState = location.state as {
   isAIEnabled?: boolean;
   aiDifficulty?: 'easy' | 'medium' | 'hard';
   battleLocation?: [number, number];
-  mapSize?: 10 | 20 | 30;
+  mapSize?: 10 | 15 | 20;
 } | null;
 const MAP_CENTER: [number, number] = lobbyState?.battleLocation ?? DEFAULT_MAP_CENTER;
 const MAP_SIZE = lobbyState?.mapSize ?? 10;

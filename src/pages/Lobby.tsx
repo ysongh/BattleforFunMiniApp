@@ -6,7 +6,7 @@ interface GameSettings {
   startingFunds: number;
   fogOfWar: boolean;
   turnTimeLimit: number; // In seconds, 0 means no limit
-  mapSize: 10 | 20 | 30;
+  mapSize: 10 | 15 | 20;
 }
 
 type AIDifficulty = 'easy' | 'medium' | 'hard';
@@ -98,7 +98,7 @@ const Lobby = ({ }) => {
               <div>
                 <label className="block text-gray-700 mb-1">Map Size</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {([10, 20, 30] as const).map(size => (
+                  {([10, 15, 20] as const).map(size => (
                     <button
                       key={size}
                       className={`px-3 py-2 text-sm rounded ${gameSettings.mapSize === size ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}

@@ -1,12 +1,12 @@
 # BattleforFunMiniApp
 
-A turn-based strategy game inspired by Advance Wars, built with React 19, TypeScript, Tailwind CSS, `@react-three/fiber`, and MapLibre GL JS. Command units on a square grid (10×10, 20×20, or 30×30) overlaid on a real OpenStreetMap street map — pick any location on Earth from the lobby and fight there.
+A turn-based strategy game inspired by Advance Wars, built with React 19, TypeScript, Tailwind CSS, `@react-three/fiber`, and MapLibre GL JS. Command units on a square grid (10×10, 15×15, or 20×20) overlaid on a real OpenStreetMap street map — pick any location on Earth from the lobby and fight there.
 
 ## Features
 
 ### Gameplay
 - **Turn-based combat** on a real-world OSM map at the location you pick in the lobby
-- **Selectable map size** (10×10 / 20×20 / 30×30) with 15 m cells — units roughly match real street width
+- **Selectable map size** (10×10 / 15×15 / 20×20) with 15 m cells — units roughly match real street width
 - **Lobby location picker**: click anywhere on the world map, drag the marker, or use preset cities (NYC, Paris, London, Tokyo, Rome, San Francisco)
 - **4 unit types**: Infantry, Tank, Artillery, Chopper — each with unique 3D models and stats. Choppers fly over every terrain
 - **Real terrain**: Roads, Forest, City, Water, Mountain fetched from the Overpass API (cached in localStorage). Terrain affects movement cost and defense
@@ -58,7 +58,7 @@ npm run dev
 ### Lobby
 1. **Pick a battle location** on the interactive world map (click, drag, or preset)
 2. **Pick AI difficulty** (Easy / Medium / Hard)
-3. **Pick map size** (10×10 / 20×20 / 30×30)
+3. **Pick map size** (10×10 / 15×15 / 20×20)
 4. Hit **Start Game**
 
 ### Your turn (Red)

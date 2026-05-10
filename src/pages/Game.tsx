@@ -44,7 +44,7 @@ const Game = () => {
     isAIEnabled?: boolean;
     aiDifficulty?: 'easy' | 'medium' | 'hard';
     battleLocation?: [number, number];
-    mapSize?: 10 | 20 | 30;
+    mapSize?: 10 | 15 | 20;
   } | null;
   const MAP_CENTER: [number, number] = lobbyState?.battleLocation ?? DEFAULT_MAP_CENTER;
   const MAP_SIZE = lobbyState?.mapSize ?? 10;
